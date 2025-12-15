@@ -1,0 +1,5 @@
+{
+  "name": "Stock Super-Scanner",
+  "description": "A comprehensive dashboard for stock market analysis, focusing on technical indicators like Golden Crossovers, EMA, Volume Trends, and more for a large number of stocks. Includes optional AI-powered sentiment analysis.",
+  "requestFramePermissions": []
+}
