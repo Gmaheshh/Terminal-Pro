@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Column, PortfolioBacktestResult } from '../types';
 import { ArrowDownIcon, ArrowUpIcon } from './Icons';
@@ -69,8 +70,8 @@ export const PortfolioSimulationDashboard: React.FC<PortfolioSimulationDashboard
       <div className="p-4 text-bb-text text-xs bg-bb-panel border-b border-bb-border">
         <h3 className="font-bold text-bb-orange mb-2 uppercase">>> SIMULATION PROTOCOL RESULTS</h3>
         <p className="max-w-4xl leading-relaxed text-bb-muted">
-            Executing 3 distinct trading algorithms over variable historical periods. Initial Seed: 100k INR. 
-            Risk Model: Fixed Fractional (2% Equity). Max Drawdown Limit: N/A. Position Cap: 25%.
+            Executing algorithmic trading models vs. passive market benchmarks. Initial Seed: 100k INR. 
+            Benchmark: Nifty 50 Buy & Hold. Goal: Outperform market alpha with risk-managed entries.
         </p>
       </div>
       <table className="w-full border-collapse">
@@ -96,14 +97,24 @@ export const PortfolioSimulationDashboard: React.FC<PortfolioSimulationDashboard
         </thead>
         <tbody className="bg-bb-black divide-y divide-bb-border">
           {sortedData.length > 0 ? sortedData.map((item, rowIndex) => (
-            <tr key={`${item.strategy}-${item.period}-${rowIndex}`} className="hover:bg-bb-panel transition-colors">
-              {columns.map((column, colIndex) => (
-                <td key={colIndex} className="px-4 py-2 whitespace-nowrap text-xs text-bb-text border-r border-bb-border last:border-r-0">
-                  {typeof column.accessor === 'function'
-                    ? column.accessor(item)
-                    : (item as any)[column.accessor]}
-                </td>
-              ))}
+            <tr 
+                key={`${item.strategy}-${item.period}-${rowIndex}`} 
+                className={`hover:bg-bb-panel transition-colors ${item.isBenchmark ? 'bg-bb-blue/5 border-l-4 border-l-bb-blue' : ''}`}
+            >
+              {columns.map((column, colIndex) => {
+                const isStrategyCol = column.header === 'Strategy';
+                return (
+                    <td key={colIndex} className="px-4 py-2 whitespace-nowrap text-xs text-bb-text border-r border-bb-border last:border-r-0">
+                      {isStrategyCol && item.isBenchmark ? (
+                          <span className="text-bb-blue font-bold tracking-tighter">BENCHMARK (PASSIVE)</span>
+                      ) : (
+                        typeof column.accessor === 'function'
+                            ? column.accessor(item)
+                            : (item as any)[column.accessor]
+                      )}
+                    </td>
+                );
+              })}
             </tr>
           )) : (
             <tr>

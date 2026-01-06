@@ -1,5 +1,6 @@
+
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import type { OHLCV } from '../types';
 
 interface StockChartProps {
@@ -47,7 +48,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker }) => {
     });
 
     // Candlestick Series - High Contrast
-    const candlestickSeries = chart.addCandlestickSeries({
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#000000', // Hollow body for up
       downColor: '#ff3333', // Filled red for down
       borderUpColor: '#00ff00', // Neon green border
@@ -67,7 +68,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker }) => {
     candlestickSeries.setData(chartData);
 
     // Volume Series
-    const volumeSeries = chart.addHistogramSeries({
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       color: '#26a69a',
       priceFormat: {
         type: 'volume',

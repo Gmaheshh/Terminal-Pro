@@ -1,32 +1,19 @@
-import type { StockData, OHLCV } from '../types';
+
+import type { StockData, OHLCV, OptionChain, OptionContract } from '../types';
 import { Tickers } from '../constants';
 
-// A simple in-session cache to avoid re-fetching data during a session
 const cache = new Map<string, StockData>();
 
-// A pool of public CORS proxies to rotate through.
-// This provides redundancy if one of the services is down or rate-limiting.
 const PROXIES = [
   'https://corsproxy.io/?',
   'https://cors.eu.org/',
   'https://thingproxy.freeboard.io/fetch/',
 ];
 
-const MAX_ATTEMPTS = 6; // Total attempts, will cycle through proxies
-const RETRY_DELAY = 1000; // 1 second base delay
-const FETCH_TIMEOUT = 10000; // 10 seconds
+const MAX_ATTEMPTS = 6; 
+const RETRY_DELAY = 1000; 
+const FETCH_TIMEOUT = 10000; 
 
-/**
- * Fetches real stock data from the Yahoo Finance API via a pool of rotating CORS proxies.
- * Includes a retry mechanism that cycles through different proxies to handle transient network errors
- * and individual proxy failures, including non-JSON responses.
- *
- * NOTE: Using public CORS proxies remains a solution for development/demo purposes.
- * For a production application, a dedicated backend service is the most reliable approach.
- *
- * @param {string} ticker The stock ticker symbol (e.g., 'RELIANCE.NS').
- * @returns {Promise<StockData>} A promise that resolves to the stock's data.
- */
 export const fetchStockData = async (ticker: string): Promise<StockData> => {
   if (cache.has(ticker)) {
     return cache.get(ticker)!;
@@ -44,7 +31,7 @@ export const fetchStockData = async (ticker: string): Promise<StockData> => {
       const response = await fetch(fullUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status} for ticker: ${ticker} using proxy: ${proxyUrl}`);
+        throw new Error(`HTTP ${response.status}`);
       }
       
       const responseText = await response.text();
@@ -52,27 +39,42 @@ export const fetchStockData = async (ticker: string): Promise<StockData> => {
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        // This catch block handles JSON parsing errors. The proxy likely returned HTML or other non-JSON content.
-        const errorSnippet = responseText.substring(0, 150).replace(/\s+/g, ' ');
-        throw new SyntaxError(`Proxy returned non-JSON content. Snippet: "${errorSnippet}..."`);
+        throw new SyntaxError(`Proxy non-JSON.`);
       }
 
-
       if (!data.chart || data.chart.error) {
-        throw new Error(data.chart.error?.message || `No data found for ${ticker}`);
+        throw new Error(data.chart.error?.message || `No data`);
       }
   
       const result = data.chart.result[0];
       if (!result || !result.timestamp || !result.indicators.quote[0]) {
-          throw new Error(`Invalid data structure for ${ticker}`);
+          throw new Error(`Invalid structure`);
       }
   
       const timestamps: number[] = result.timestamp;
       const quotes = result.indicators.quote[0];
+      const rawOi = result.indicators.quote[0].openinterest || [];
   
       const historical: OHLCV[] = [];
+      
+      let currentBaseOi = 1000000 + (Math.random() * 2000000);
+
       for (let i = 0; i < timestamps.length; i++) {
-          if (timestamps[i] && quotes.open[i] !== null && quotes.high[i] !== null && quotes.low[i] !== null && quotes.close[i] !== null && quotes.volume[i] !== null) {
+          if (timestamps[i] && quotes.close[i] !== null) {
+              
+              const priceChange = i > 0 ? (quotes.close[i] - quotes.close[i-1]) / quotes.close[i-1] : 0;
+              const vol = quotes.volume[i] || 0;
+              
+              if (priceChange > 0.01 && vol > 500000) {
+                  currentBaseOi *= (1 + 0.02 + Math.random() * 0.04);
+              } else if (priceChange < -0.01) {
+                  currentBaseOi *= (1 - 0.01); 
+              } else {
+                  currentBaseOi *= (1 + (Math.random() * 0.002 - 0.001));
+              }
+
+              const simulatedOi = rawOi[i] || currentBaseOi;
+              
               historical.push({
                   date: new Date(timestamps[i] * 1000).toISOString().split('T')[0],
                   open: quotes.open[i],
@@ -80,44 +82,72 @@ export const fetchStockData = async (ticker: string): Promise<StockData> => {
                   low: quotes.low[i],
                   close: quotes.close[i],
                   volume: quotes.volume[i],
+                  openInterest: simulatedOi,
               });
           }
       }
   
       if (historical.length === 0) {
-        throw new Error(`No valid historical data points for ${ticker}`);
+        throw new Error(`No historical points`);
       }
       
       const currentPrice = historical[historical.length - 1].close;
       const stockData: StockData = { ticker, currentPrice, historical };
   
       cache.set(ticker, stockData);
-      return stockData; // Success, exit loop
+      return stockData;
     
     } catch (error) {
       lastError = error as Error;
-
-      if (error instanceof SyntaxError) {
-        console.error(`Failed to parse response for ${ticker} with proxy ${proxyUrl}.`, error);
-      } else if ((error as Error).name === 'TimeoutError') {
-         console.warn(`Attempt ${attempt} timed out for ${ticker} with proxy ${proxyUrl}. Retrying...`);
-      } else {
-        console.warn(`Attempt ${attempt} failed for ${ticker} with proxy ${proxyUrl}. Retrying...`, (error as Error).message);
-      }
-
-
       if (attempt < MAX_ATTEMPTS) {
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       }
     }
   }
 
-  // If all retries fail, throw the last captured error with a more user-friendly message for JSON parsing failures.
-  console.error(`Failed to fetch stock data for ${ticker} after ${MAX_ATTEMPTS} attempts.`, lastError);
-  if (lastError instanceof SyntaxError) {
-      throw new Error(`Data for ${ticker} could not be parsed. The ticker may be delisted or there is a persistent proxy issue.`);
-  }
   throw lastError!;
+};
+
+/**
+ * Simulates a realistic Option Chain based on the underlying price.
+ */
+export const fetchOptionChain = (ticker: string, underlyingPrice: number): OptionChain => {
+    const strikeInterval = underlyingPrice < 500 ? 5 : underlyingPrice < 2000 ? 20 : 50;
+    const atmStrike = Math.round(underlyingPrice / strikeInterval) * strikeInterval;
+    
+    const strikes = [];
+    for (let i = -10; i <= 10; i++) {
+        strikes.push(atmStrike + (i * strikeInterval));
+    }
+
+    const generateContract = (strike: number, isCall: boolean): OptionContract => {
+        const distance = isCall ? (strike - underlyingPrice) : (underlyingPrice - strike);
+        const intrinsic = Math.max(0, isCall ? (underlyingPrice - strike) : (strike - underlyingPrice));
+        
+        // Simplified Black-Scholes-like approximation for demo
+        const timeValue = Math.max(2, (underlyingPrice * 0.05) / (1 + Math.abs(distance / strikeInterval)));
+        const price = intrinsic + timeValue;
+        
+        const baseIV = 15 + Math.random() * 10;
+        const skew = Math.abs(distance / strikeInterval) * 2;
+        
+        return {
+            strike,
+            price: Number(price.toFixed(2)),
+            change: Number((Math.random() * 10 - 5).toFixed(2)),
+            iv: Number((baseIV + skew).toFixed(1)),
+            oi: Math.round(10000 / (1 + Math.abs(distance / strikeInterval) * 2)),
+            volume: Math.round(5000 / (1 + Math.abs(distance / strikeInterval) * 3))
+        };
+    };
+
+    return {
+        ticker,
+        expiryDate: '27-MAR-2025', // Simulated nearest monthly expiry
+        underlyingPrice,
+        calls: strikes.map(s => generateContract(s, true)),
+        puts: strikes.map(s => generateContract(s, false))
+    };
 };
 
 export { Tickers };

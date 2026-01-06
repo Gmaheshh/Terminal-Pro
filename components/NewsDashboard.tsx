@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import type { ProcessedStock, NewsResult } from '../types';
 import { fetchMarketNews } from '../services/newsService';
@@ -17,7 +19,6 @@ const NewsDashboard: React.FC<NewsDashboardProps> = ({ processedStocks }) => {
         // Prioritize stocks with signals
         const signaledStocks = processedStocks.filter(s => 
             s.signals.volumeSignal === 'Spike' || 
-            s.signals.shortTermCrossBuySignal || 
             s.signals.vwlmBuySignal
         );
         

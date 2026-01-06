@@ -1,3 +1,5 @@
+
+
 import type { ProcessedStock, RiskAnalysis } from '../types';
 
 const INITIAL_CAPITAL = 100000;
@@ -15,7 +17,6 @@ export const calculatePortfolioRisk = (stocks: ProcessedStock[]): RiskAnalysis =
     
     // Tickers that are active in specific strategies
     const volStrategyTickers = new Set<string>();
-    const crossStrategyTickers = new Set<string>();
     const vwlmStrategyTickers = new Set<string>();
     
     // Count of strategies each stock appears in
@@ -32,14 +33,6 @@ export const calculatePortfolioRisk = (stocks: ProcessedStock[]): RiskAnalysis =
             activeInStrategies++;
         }
         
-        if (stock.signals.shortTermCrossBuySignal) {
-             // For simplicity in risk calc, we treat cross signal as additional potential exposure
-             // In reality, user might pick one strategy, but risk desk assumes worst case (all signals taken)
-             shares += stock.signals.suggestedShares || 0;
-             crossStrategyTickers.add(stock.ticker);
-             activeInStrategies++;
-        }
-
         if (stock.signals.vwlmBuySignal) {
              shares += stock.signals.suggestedShares || 0;
              vwlmStrategyTickers.add(stock.ticker);

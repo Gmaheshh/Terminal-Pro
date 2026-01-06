@@ -1,9 +1,8 @@
 
-
 import React, { useEffect, useRef } from 'react';
 import type { PortfolioBacktestResult } from '../types';
 import { XIcon } from './Icons';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, AreaSeries } from 'lightweight-charts';
 
 interface BacktestDetailsModalProps {
   isOpen: boolean;
@@ -56,10 +55,13 @@ const BacktestDetailsModal: React.FC<BacktestDetailsModalProps> = ({ isOpen, onC
         },
     });
 
-    const areaSeries = chart.addAreaSeries({
-        lineColor: '#00ff00',
-        topColor: 'rgba(0, 255, 0, 0.4)',
-        bottomColor: 'rgba(0, 255, 0, 0)',
+    const themeColor = result.isBenchmark ? '#00ccff' : '#00ff00';
+    const fillAlpha = result.isBenchmark ? 'rgba(0, 204, 255, 0.4)' : 'rgba(0, 255, 0, 0.4)';
+
+    const areaSeries = chart.addSeries(AreaSeries, {
+        lineColor: themeColor,
+        topColor: fillAlpha,
+        bottomColor: 'transparent',
     });
 
     if (result.equityCurve && result.equityCurve.length > 0) {
@@ -103,7 +105,9 @@ const BacktestDetailsModal: React.FC<BacktestDetailsModalProps> = ({ isOpen, onC
       >
         <header className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-white">Portfolio Simulation Details</h2>
+            <h2 className="text-lg font-semibold text-white">
+                {result.isBenchmark ? 'Market Benchmark Analysis' : 'Portfolio Simulation Details'}
+            </h2>
             <p className="text-sm text-gray-400">{result.strategy} ({result.period})</p>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-700 transition-colors">
@@ -124,49 +128,59 @@ const BacktestDetailsModal: React.FC<BacktestDetailsModalProps> = ({ isOpen, onC
 
         {/* Equity Curve Chart Section */}
         <div className="w-full h-64 p-4 border-b border-gray-700 bg-gray-900">
-             <div className="text-xs text-gray-400 mb-2 uppercase font-bold">Equity Curve</div>
+             <div className="text-xs text-gray-400 mb-2 uppercase font-bold">
+                 {result.isBenchmark ? 'Benchmark Growth Curve' : 'Strategy Equity Curve'}
+             </div>
              <div ref={chartContainerRef} className="w-full h-full" />
         </div>
 
         <main className="overflow-y-auto px-4 pb-4 mt-2">
-          <div className="text-xs text-gray-400 mb-2 uppercase font-bold">Trade Ledger</div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-                <thead className="bg-gray-700/50 sticky top-0">
-                    <tr>
-                        <th className="p-2 text-left font-semibold text-gray-300">Ticker</th>
-                        <th className="p-2 text-left font-semibold text-gray-300">Entry Date</th>
-                        <th className="p-2 text-right font-semibold text-gray-300">Entry Price</th>
-                        <th className="p-2 text-right font-semibold text-gray-300">Shares</th>
-                        <th className="p-2 text-left font-semibold text-gray-300">Exit Date</th>
-                        <th className="p-2 text-right font-semibold text-gray-300">Exit Price</th>
-                        <th className="p-2 text-right font-semibold text-gray-300">Trade RoI</th>
-                        <th className="p-2 text-right font-semibold text-gray-300">P/L (₹)</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                    {result.trades.map((trade, index) => {
-                        const tradeRoIColor = trade.tradeRoI > 0 ? 'text-emerald-400' : 'text-red-400';
-                        const tradeRoISign = trade.tradeRoI > 0 ? '+' : '';
+          <div className="text-xs text-gray-400 mb-2 uppercase font-bold">{result.isBenchmark ? 'Simulation Logic' : 'Trade Ledger'}</div>
+          {result.isBenchmark ? (
+              <div className="bg-gray-900 p-4 border border-gray-700 text-sm text-gray-400">
+                  <p>Passive Investment simulation assumes ₹100,000 was converted into Nifty 50 Index units at the close price of the start date and held continuously until the current terminal session.</p>
+                  <p className="mt-2">Starting Price: <span className="text-white">₹{result.trades[0]?.entryPrice.toFixed(2)}</span></p>
+                  <p>Ending Price: <span className="text-white">₹{result.trades[0]?.exitPrice.toFixed(2)}</span></p>
+              </div>
+          ) : (
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                    <thead className="bg-gray-700/50 sticky top-0">
+                        <tr>
+                            <th className="p-2 text-left font-semibold text-gray-300">Ticker</th>
+                            <th className="p-2 text-left font-semibold text-gray-300">Entry Date</th>
+                            <th className="p-2 text-right font-semibold text-gray-300">Entry Price</th>
+                            <th className="p-2 text-right font-semibold text-gray-300">Shares</th>
+                            <th className="p-2 text-left font-semibold text-gray-300">Exit Date</th>
+                            <th className="p-2 text-right font-semibold text-gray-300">Exit Price</th>
+                            <th className="p-2 text-right font-semibold text-gray-300">Trade RoI</th>
+                            <th className="p-2 text-right font-semibold text-gray-300">P/L (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700">
+                        {result.trades.map((trade, index) => {
+                            const tradeRoIColor = trade.tradeRoI > 0 ? 'text-emerald-400' : 'text-red-400';
+                            const tradeRoISign = trade.tradeRoI > 0 ? '+' : '';
 
-                        const pnlColor = trade.pnl > 0 ? 'text-emerald-400' : 'text-red-400';
-                        
-                        return (
-                            <tr key={index} className="hover:bg-gray-700/30">
-                                <td className="p-2 whitespace-nowrap font-bold text-cyan-400">{trade.ticker}</td>
-                                <td className="p-2 whitespace-nowrap">{trade.entryDate}</td>
-                                <td className="p-2 whitespace-nowrap text-right">₹{trade.entryPrice.toFixed(2)}</td>
-                                <td className="p-2 whitespace-nowrap text-right">{trade.shares.toLocaleString()}</td>
-                                <td className="p-2 whitespace-nowrap">{trade.exitDate}</td>
-                                <td className="p-2 whitespace-nowrap text-right">₹{trade.exitPrice.toFixed(2)}</td>
-                                <td className={`p-2 whitespace-nowrap text-right font-medium ${tradeRoIColor}`}>{`${tradeRoISign}${trade.tradeRoI.toFixed(2)}%`}</td>
-                                <td className={`p-2 whitespace-nowrap text-right font-medium ${pnlColor}`}>{pnlFormatter.format(trade.pnl)}</td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-          </div>
+                            const pnlColor = trade.pnl > 0 ? 'text-emerald-400' : 'text-red-400';
+                            
+                            return (
+                                <tr key={index} className="hover:bg-gray-700/30">
+                                    <td className="p-2 whitespace-nowrap font-bold text-cyan-400">{trade.ticker}</td>
+                                    <td className="p-2 whitespace-nowrap">{trade.entryDate}</td>
+                                    <td className="p-2 whitespace-nowrap text-right">₹{trade.entryPrice.toFixed(2)}</td>
+                                    <td className="p-2 whitespace-nowrap text-right">{trade.shares.toLocaleString()}</td>
+                                    <td className="p-2 whitespace-nowrap">{trade.exitDate}</td>
+                                    <td className="p-2 whitespace-nowrap text-right">₹{trade.exitPrice.toFixed(2)}</td>
+                                    <td className={`p-2 whitespace-nowrap text-right font-medium ${tradeRoIColor}`}>{`${tradeRoISign}${trade.tradeRoI.toFixed(2)}%`}</td>
+                                    <td className={`p-2 whitespace-nowrap text-right font-medium ${pnlColor}`}>{pnlFormatter.format(trade.pnl)}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+          )}
         </main>
       </div>
     </div>

@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -22,73 +23,100 @@ const Highlight: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <span className="font-bold text-bb-blue">{children}</span>
 );
 
-const Code: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <code className="bg-bb-panel text-bb-green px-2 py-0.5 text-xs">{children}</code>
-);
-
 const UserManual: React.FC = () => {
     return (
-        <div className="p-8 max-w-5xl mx-auto font-mono h-full overflow-y-auto">
+        <div className="p-8 max-w-5xl mx-auto font-mono h-full overflow-y-auto custom-scrollbar bg-bb-black">
             <header className="mb-12 border-b-2 border-bb-orange pb-6">
-                <h1 className="text-3xl font-bold text-white uppercase">System Documentation <span className="text-bb-orange text-lg">v2.4.0</span></h1>
-                <p className="mt-2 text-bb-muted uppercase">Automated Trading Strategy & Signal Logic</p>
+                <h1 className="text-3xl font-bold text-white uppercase">GP Alpha <span className="text-bb-orange text-lg">by Growth Prospect Investments</span></h1>
+                <p className="mt-2 text-bb-muted uppercase">Quantitative Core & AI Intelligence Framework v3.1.0</p>
             </header>
 
             <div className="bg-bb-panel border border-bb-blue p-4 mb-8 text-xs text-bb-blue uppercase font-bold">
-                [SYSTEM ALERT] Strategy Simulation Mode: LONG-ONLY. "SELL" Signals initiate exit of LONG positions. Short selling is disabled in current firmware.
+                [SYSTEM NOTE] All strategies prioritize institutional Open Interest (OI) accrual. Pure retail breakouts without contract build-up are flagged as "Noise."
             </div>
             
-            <Section title="1.0 // Volatility Breakout Protocol">
-                <p>Designed for rapid momentum capture. Identifies assets in confirmed uptrend exhibiting statistically significant volume surge.</p>
+            <Section title="1.0 // Smart Breakout Protocol (Volatility + OI)">
+                <p className="text-bb-muted mb-4 italic">"This Strategy Mainly works on: Price Action, Volume Spikes, ADX Based trend confirmation and Open Interest Build Up."</p>
                 
-                <SubSection title="1.1 ENTRY PARAMETERS">
-                    <ul className="list-square pl-5 space-y-2">
-                        <li><Highlight>RVOL > 3.0</Highlight>: Relative Volume exceeds 300% of 20-day baseline.</li>
-                        <li><Highlight>ADX > 25</Highlight>: Trend strength confirmed. +DI must exceed -DI.</li>
+                <SubSection title="1.1 ENTRY CRITERIA">
+                    <ul className="list-none space-y-2">
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>Squeeze Release:</Highlight> Bollinger Bands moving outside Keltner Channel.</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>Relative Volume (RVOL) > 2.5:</Highlight> High transactional conviction vs 21-day average.</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>OI Build > 1.0%:</Highlight> <span className="text-bb-green font-bold">MANDATORY.</span> Confirms Long Build-up. Breaks without OI are rejected.</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>Trend Filter:</Highlight> Price must be maintained above the 200 EMA.</span>
+                        </li>
                     </ul>
                 </SubSection>
 
-                <SubSection title="1.2 RISK MANAGEMENT">
-                     <p>Dynamic volatility-based stop calculation.</p>
-                     <p><Code>STOP_LOSS = PRICE - (3 * ATR_7)</Code></p>
-                     <p><Code>TAKE_PROFIT = PRICE + (RISK * 2)</Code></p>
-                </SubSection>
-            </Section>
-
-            <Section title="2.0 // Short-Term Crossover Protocol">
-                <p>Standard momentum shift detection for medium-frequency swing trading.</p>
-                 <SubSection title="2.1 LOGIC GATE">
-                    <ul className="list-square pl-5 space-y-2">
-                        <li><Highlight>ENTRY</Highlight>: SMA_20 CROSS_OVER SMA_50 (Golden Cross).</li>
-                        <li><Highlight>EXIT</Highlight>: SMA_20 CROSS_UNDER SMA_50 (Death Cross) OR Stop/Target Hit.</li>
-                        <li><Highlight>RISK CALC</Highlight>: Swing Low (20-period) vs Swing High (50-period).</li>
-                        <li><Highlight>FILTER</Highlight>: Reward/Risk Ratio >= 1.5 REQUIRED.</li>
-                    </ul>
-                </SubSection>
-            </Section>
-
-             <Section title="3.0 // VWLM (Volume-Weighted Log Momentum)">
-                <p>Advanced algorithmic signal derived from volume-weighted logarithmic returns (Xt).</p>
-                <SubSection title="3.1 FORMULA">
-                     <p><Code>Xt = Log(Close/Prev) * (Vol / Vol_Avg_20)</Code></p>
-                </SubSection>
-                <SubSection title="3.2 SIGNAL GENERATION">
-                     <ul className="list-square pl-5 space-y-2">
-                        <li><Highlight>BUY</Highlight>: EMA_9(Xt) > EMA_21(Xt) AND Xt >= 0.1 AND RSI > 50.</li>
-                        <li><Highlight>SELL</Highlight>: EMA_9(Xt) &lt; EMA_21(Xt) AND Xt &lt;= -0.1 AND RSI &lt; 50.</li>
+                <SubSection title="1.2 EXIT PROTOCOL">
+                    <ul className="list-none space-y-2">
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span>Liquidate on <Highlight>ATR-based Stoploss</Highlight> (3x ATR7) or <Highlight>Take Profit</Highlight> (2x Risk).</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span>Immediate exit if <Highlight>Opposite Trend Signal</Highlight> is detected.</span>
+                        </li>
                     </ul>
                 </SubSection>
             </Section>
 
-            <Section title="4.0 // Portfolio Simulator Engine">
-                <p>Historical backtesting kernel running independent simulations for each strategy logic.</p>
-
-                <SubSection title="4.1 EXECUTION RULES">
-                     <ul className="list-square pl-5 space-y-2">
-                        <li><Highlight>CAPITAL</Highlight>: 100,000 INR Initial Seed.</li>
-                        <li><Highlight>RISK MODEL</Highlight>: Fixed Fractional (2% Risk of Total Equity per Trade).</li>
-                        <li><Highlight>DIVERSIFICATION</Highlight>: Hard cap of 25% Equity per Position.</li>
+             <Section title="2.0 // Conviction-Weighted Momentum (VWLM)">
+                <p className="text-bb-muted mb-4 italic">"This Strategy identifies 'True Alpha' by weighting Log-Returns against transactional conviction (Relative Volume)."</p>
+                
+                <SubSection title="2.1 ENTRY CRITERIA">
+                    <ul className="list-none space-y-2">
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>EMA Crossover:</Highlight> 9-EMA of Xt vector crosses above 21-EMA of Xt vector.</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>Magnitude (Xt) ≥ 0.1:</Highlight> Ensures move is driven by high-velocity volume.</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>Strength Crossover:</Highlight> ADX > 25 (Trend) and RSI > 50 (Bullish Momentum).</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span><Highlight>Institutional Filter:</Highlight> Mandatory > 0.5% OI build-up on crossover date.</span>
+                        </li>
                     </ul>
+                </SubSection>
+
+                <SubSection title="2.2 RISK MANAGEMENT">
+                    <ul className="list-none space-y-2">
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span>Stoploss: 2x ATR (7-day).</span>
+                        </li>
+                        <li className="flex items-start">
+                            <span className="text-bb-red mr-2">•</span>
+                            <span>Target: 4x ATR (7-day) [Institutional 1:2 R/R ratio].</span>
+                        </li>
+                    </ul>
+                </SubSection>
+            </Section>
+
+            <Section title="3.0 // AI Intelligence Framework">
+                <SubSection title="3.1 GEMINI SEARCH GROUNDING">
+                    <p>The system probes official <Highlight>NSE/BSE Filings</Highlight> and <Highlight>Quarterly Results</Highlight> in real-time. It identifies "Divergence" when technical signals conflict with corporate disclosures.</p>
+                </SubSection>
+                <SubSection title="3.2 PSYCHE-ALPHA COACH">
+                    <p>Uses behavioral modeling to detect <Highlight>FOMO</Highlight> or <Highlight>Loss Aversion</Highlight> within simulation logs, assigning a "Mental Capital Score" to the strategy profile.</p>
                 </SubSection>
             </Section>
         </div>

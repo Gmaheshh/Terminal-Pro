@@ -1,6 +1,6 @@
 
-import type { ProcessedStock, PortfolioBacktestResult, Trade, EquityPoint, StockData } from '../types';
-import { calculateIndicators } from './technicalAnalysisService';
+import type { ProcessedStock, PortfolioBacktestResult, Trade, EquityPoint } from '../types';
+import { calculateATR, calculateADX, calculateSMA, calculateIndicators } from './technicalAnalysisService';
 
 interface BacktestTrade extends Trade {
     stopLoss: number;
@@ -21,68 +21,8 @@ const BACKTEST_PERIODS: BacktestPeriod[] = [
 ];
 
 const INITIAL_CAPITAL = 100000;
-const RISK_PERCENT_PER_TRADE = 0.02; 
-const MAX_POSITION_PERCENT = 0.25; 
-
-const runBenchmarkSimulation = (niftyData: StockData): PortfolioBacktestResult[] => {
-    const results: PortfolioBacktestResult[] = [];
-
-    for (const period of BACKTEST_PERIODS) {
-        const startDate = new Date(new Date().setDate(new Date().getDate() - period.years * 365));
-        const historical = niftyData.historical.filter(d => new Date(d.date) >= startDate);
-
-        if (historical.length < 2) continue;
-
-        const startPrice = historical[0].close;
-        const shares = INITIAL_CAPITAL / startPrice;
-        
-        const equityCurve: EquityPoint[] = historical.map(d => ({
-            time: d.date,
-            value: d.close * shares
-        }));
-
-        const finalCapital = equityCurve[equityCurve.length - 1].value;
-        const totalReturn = ((finalCapital - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
-        const cagr = (Math.pow(finalCapital / INITIAL_CAPITAL, 1 / period.years) - 1) * 100;
-
-        // Drawdown calculation
-        let maxDrawdown = 0;
-        let peak = 0;
-        equityCurve.forEach(pt => {
-            if (pt.value > peak) peak = pt.value;
-            const dd = peak === 0 ? 0 : ((peak - pt.value) / peak) * 100;
-            if (dd > maxDrawdown) maxDrawdown = dd;
-        });
-
-        results.push({
-            strategy: "Benchmark (Nifty 50)",
-            period: period.label,
-            totalTrades: 1,
-            winRate: finalCapital > INITIAL_CAPITAL ? 100 : 0,
-            totalReturn,
-            cagr,
-            maxDrawdown,
-            trades: [{
-                ticker: "NIFTY_ETF",
-                entryDate: historical[0].date,
-                entryPrice: startPrice,
-                exitDate: historical[historical.length - 1].date,
-                exitPrice: historical[historical.length - 1].close,
-                pnl: finalCapital - INITIAL_CAPITAL,
-                tradeRoI: totalReturn,
-                shares,
-                entryCapital: INITIAL_CAPITAL,
-                exitCapital: finalCapital
-            }],
-            initialCapital: INITIAL_CAPITAL,
-            finalCapital,
-            equityCurve,
-            isBenchmark: true
-        });
-    }
-
-    return results;
-};
+const RISK_PERCENT_PER_TRADE = 0.02; // Risk 2% of portfolio per trade
+const MAX_POSITION_PERCENT = 0.25; // Max 25% of portfolio in a single position
 
 const runSingleStrategySimulation = (
     strategyName: string,
@@ -100,7 +40,7 @@ const runSingleStrategySimulation = (
         const dailyDataMap = new Map<string, Map<string, { close: number; high: number; low: number; }>>();
 
         stocks.forEach(stock => {
-            if (stock.data.historical.length > 200) {
+            if (stock.data.historical.length > 252 * period.years) {
                 stock.data.historical.forEach(d => {
                     if (new Date(d.date) >= startDate) {
                         allDates.add(d.date);
@@ -122,11 +62,13 @@ const runSingleStrategySimulation = (
         const openPositions: BacktestTrade[] = [];
         const closedTrades: BacktestTrade[] = [];
         
+        // Metrics tracking
         const equityCurve: EquityPoint[] = [];
         let peakEquity = INITIAL_CAPITAL;
         let maxDrawdown = 0;
 
         for (const date of sortedDates) {
+            // 1. Manage and close existing positions
             const stillOpenPositions: BacktestTrade[] = [];
             for (const trade of openPositions) {
                 const dayData = dailyDataMap.get(trade.ticker)?.get(date);
@@ -143,6 +85,8 @@ const runSingleStrategySimulation = (
                     } else if (getExitSignalsForDate && getExitSignalsForDate(date)?.some(s => s.ticker === trade.ticker)) {
                         exitPrice = dayData.close;
                         exitCondition = 'Signal';
+                    } else if (trade.exitCondition === 'Death Cross') {
+                         exitPrice = dayData.close;
                     }
                 }
 
@@ -155,7 +99,7 @@ const runSingleStrategySimulation = (
                     trade.tradeRoI = ((trade.exitPrice - trade.entryPrice) / trade.entryPrice) * 100;
                     trade.pnl = (trade.exitPrice - trade.entryPrice) * trade.shares;
                     
-                    availableCapital += trade.exitCapital; 
+                    availableCapital += trade.exitCapital; // Add capital back on trade close
                     closedTrades.push(trade);
                 } else {
                     stillOpenPositions.push(trade);
@@ -163,6 +107,7 @@ const runSingleStrategySimulation = (
             }
             openPositions.splice(0, openPositions.length, ...stillOpenPositions);
 
+            // 2. Mark to Market (Calculate Daily Equity)
             let valueOfOpenPositionsToday = 0;
             openPositions.forEach(trade => {
                 const dayData = dailyDataMap.get(trade.ticker)?.get(date);
@@ -170,55 +115,65 @@ const runSingleStrategySimulation = (
             });
             const currentTotalEquity = availableCapital + valueOfOpenPositionsToday;
             
+            // Record Equity Curve
             equityCurve.push({ time: date, value: currentTotalEquity });
 
+            // Calculate Drawdown
             if (currentTotalEquity > peakEquity) {
                 peakEquity = currentTotalEquity;
             }
-            const currentDrawdown = peakEquity === 0 ? 0 : ((peakEquity - currentTotalEquity) / peakEquity) * 100;
+            const currentDrawdown = ((peakEquity - currentTotalEquity) / peakEquity) * 100;
             if (currentDrawdown > maxDrawdown) {
                 maxDrawdown = currentDrawdown;
             }
 
+            // 3. Open New Positions
+            const capitalToRisk = currentTotalEquity * RISK_PERCENT_PER_TRADE;
+            const maxPositionCapital = currentTotalEquity * MAX_POSITION_PERCENT;
+
             const signalsForToday = getEntrySignalsForDate(date);
             for (const signal of signalsForToday) {
-                if (openPositions.some(p => p.ticker === signal.ticker)) continue; 
+                if (openPositions.some(p => p.ticker === signal.ticker)) continue; // Don't re-enter if already in a position
 
+                // --- DYNAMIC POSITION SIZING LOGIC ---
                 const riskPerShare = signal.entryPrice - signal.stopLoss;
-                if (riskPerShare <= 0) continue; 
+                if (riskPerShare <= 0) continue; // Invalid risk, skip trade
 
-                const capitalToRisk = currentTotalEquity * RISK_PERCENT_PER_TRADE;
                 let shares = Math.floor(capitalToRisk / riskPerShare);
                 if (shares === 0) continue;
 
-                const maxPositionCapital = currentTotalEquity * MAX_POSITION_PERCENT;
                 let entryCapital = shares * signal.entryPrice;
 
+                // Apply max position size constraint
                 if (entryCapital > maxPositionCapital) {
                     shares = Math.floor(maxPositionCapital / signal.entryPrice);
                     entryCapital = shares * signal.entryPrice;
                 }
                 
                 if (shares === 0) continue;
+                // --- END DYNAMIC SIZING LOGIC ---
 
                 if (availableCapital >= entryCapital) {
-                    availableCapital -= entryCapital; 
+                    availableCapital -= entryCapital; // Deduct capital for new trade
                     openPositions.push({
                         ticker: signal.ticker, entryDate: signal.date, entryPrice: signal.entryPrice,
                         shares, stopLoss: signal.stopLoss, target: signal.target,
                         exitDate: '', exitPrice: 0, pnl: 0, tradeRoI: 0,
                         entryCapital: entryCapital, 
                         exitCapital: 0,
-                        exitCondition: 'Signal',
+                        exitCondition: signal.exitCondition,
                     });
                 }
             }
         }
 
+        // Final Metrics Calculation
         const finalCapital = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].value : INITIAL_CAPITAL;
         const winRate = closedTrades.length > 0 ? (closedTrades.filter(t => t.pnl > 0).length / closedTrades.length) * 100 : 0;
         const totalReturn = ((finalCapital - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100;
         
+        // CAGR Calculation: (End / Start) ^ (1 / n) - 1
+        // We use the specific duration of data we actually simulated
         const durationYears = period.years; 
         const cagr = (Math.pow(finalCapital / INITIAL_CAPITAL, 1 / durationYears) - 1) * 100;
         
@@ -239,59 +194,78 @@ const runSingleStrategySimulation = (
 }
 
 
-export const runPortfolioSimulation = (stocks: ProcessedStock[], niftyBenchmarkData?: StockData): PortfolioBacktestResult[] => {
+export const runPortfolioSimulation = (stocks: ProcessedStock[], niftyUptrendMap?: Map<string, boolean>): PortfolioBacktestResult[] => {
     if (stocks.length === 0) return [];
 
+    // --- Generate all historical signals first ---
     const volumeSignalMap = new Map<string, any[]>();
     const vwlmBuySignalMap = new Map<string, any[]>();
+    const vwlmSellSignalMap = new Map<string, any[]>();
+
 
     for (const stock of stocks) {
-        if (stock.data.historical.length < 200) continue;
+        if (stock.data.historical.length < 201) continue;
         
         const indicators = calculateIndicators(stock.data.historical);
         const { historical } = stock.data;
-        const { atr7, adx, plusDI, minusDI, xt, ema9Xt, ema21Xt, rsi, isSqueezing, oiChangePct, ema200, rvol } = indicators;
+        // Use atr7 for risk management
+        const { sma20, sma50, rsi, atr, atr7, adx, plusDI, minusDI, xt, ema9Xt, ema21Xt } = indicators;
 
-        for (let i = 20; i < historical.length; i++) { 
+        for (let i = 200; i < historical.length; i++) { 
             const currentDay = historical[i];
-            const currentRvol = rvol[i] || 0;
-            const wasSqueezing = isSqueezing?.[i-1] || false;
-            const nowSqueezing = isSqueezing?.[i] || false;
-            const squeezeRelease = wasSqueezing && !nowSqueezing;
-            const above200 = currentDay.close > (ema200[i] || 0);
-            const oiBuild = oiChangePct[i] || 0;
-
-            if (currentRvol > 2.5 && squeezeRelease && above200 && oiBuild > 1.0) {
-                const entryPrice = currentDay.close;
-                const stopLoss = entryPrice - (2.5 * (atr7[i] || 1));
-                const risk = entryPrice - stopLoss;
-                const target = entryPrice + (risk * 3);
-                
-                const signals = volumeSignalMap.get(currentDay.date) || [];
-                signals.push({ date: currentDay.date, ticker: stock.ticker, entryPrice, stopLoss, target });
-                volumeSignalMap.set(currentDay.date, signals);
+            const isMarketUptrend = niftyUptrendMap ? niftyUptrendMap.get(currentDay.date) ?? true : true;
+            
+            // Volume Spike Logic
+            const volume = currentDay.volume;
+            const lookbackData = historical.slice(i - 20, i);
+            const avgVolume = lookbackData.reduce((sum, day) => sum + day.volume, 0) / 20;
+            
+            // Use pre-calculated indicators where possible to avoid re-calculation in loop
+            if (avgVolume > 0 && volume > (avgVolume * 3)) {
+                // Check ADX condition using pre-calculated values
+                if (adx[i] > 25 && plusDI[i] > minusDI[i] && isMarketUptrend) {
+                    const currentAtr7 = atr7[i];
+                    if (currentAtr7 > 0) {
+                        const entryPrice = currentDay.close;
+                        const stopLoss = entryPrice - (3 * currentAtr7);
+                        const risk = entryPrice - stopLoss;
+                        const target = entryPrice + (risk * 2);
+                        const signal = { date: currentDay.date, ticker: stock.ticker, entryPrice, stopLoss, target };
+                        const signals = volumeSignalMap.get(currentDay.date) || [];
+                        signals.push(signal);
+                        volumeSignalMap.set(currentDay.date, signals);
+                    }
+                }
             }
             
-            const crossover = ema9Xt[i-1] <= ema21Xt[i-1] && ema9Xt[i] > ema21Xt[i];
-            if (crossover && (xt[i] || 0) >= 0.1 && (adx[i] || 0) > 25 && (rsi[i] || 0) > 50 && oiBuild > 0.5) {
-                const entryPrice = currentDay.close;
-                const stopLoss = entryPrice - (2 * (atr7[i] || 1));
-                const target = entryPrice + (4 * (atr7[i] || 1));
-                
-                const signals = vwlmBuySignalMap.get(currentDay.date) || [];
-                signals.push({ date: currentDay.date, ticker: stock.ticker, entryPrice, stopLoss, target });
-                vwlmBuySignalMap.set(currentDay.date, signals);
+            // VWLM Logic
+            if (xt[i] && ema9Xt[i] && ema21Xt[i] && ema9Xt[i-1] && ema21Xt[i-1] && adx[i] && rsi[i] && atr7[i]) {
+                // Buy
+                if (ema9Xt[i - 1] <= ema21Xt[i - 1] && ema9Xt[i] > ema21Xt[i] && xt[i] >= 0.1 && adx[i] > 25 && rsi[i] > 50 && isMarketUptrend) {
+                    const entryPrice = currentDay.close;
+                    const stopLoss = entryPrice - (2 * atr7[i]);
+                    const target = entryPrice + (4 * atr7[i]);
+                     if (entryPrice > stopLoss) {
+                        const signal = { date: currentDay.date, ticker: stock.ticker, entryPrice, stopLoss, target };
+                        const signals = vwlmBuySignalMap.get(currentDay.date) || [];
+                        signals.push(signal);
+                        vwlmBuySignalMap.set(currentDay.date, signals);
+                    }
+                }
+                // Sell
+                if (ema9Xt[i - 1] >= ema21Xt[i - 1] && ema9Xt[i] < ema21Xt[i] && xt[i] <= -0.1 && adx[i] > 25 && rsi[i] < 50) {
+                    const signal = { date: currentDay.date, ticker: stock.ticker };
+                    const signals = vwlmSellSignalMap.get(currentDay.date) || [];
+                    signals.push(signal);
+                    vwlmSellSignalMap.set(currentDay.date, signals);
+                }
             }
         }
     }
 
+    // --- Run simulations ---
     const volumeResults = runSingleStrategySimulation("Volatility Breakout", stocks, (date) => volumeSignalMap.get(date) || []);
-    const vwlmResults = runSingleStrategySimulation("VWLM", stocks, (date) => vwlmBuySignalMap.get(date) || []);
-    
-    let benchmarkResults: PortfolioBacktestResult[] = [];
-    if (niftyBenchmarkData) {
-        benchmarkResults = runBenchmarkSimulation(niftyBenchmarkData);
-    }
+    const vwlmResults = runSingleStrategySimulation("VWLM", stocks, (date) => vwlmBuySignalMap.get(date) || [], (date) => vwlmSellSignalMap.get(date) || []);
 
-    return [...volumeResults, ...vwlmResults, ...benchmarkResults];
+    return [...volumeResults, ...vwlmResults];
 };

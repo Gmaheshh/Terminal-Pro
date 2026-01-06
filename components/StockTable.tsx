@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Column, ProcessedStock } from '../types';
 import { ArrowDownIcon, ArrowUpIcon } from './Icons';
@@ -31,11 +32,13 @@ const StockTable: React.FC<StockTableProps> = ({ columns, data, activeTab, onHov
             case 'RSI': return stock.indicators.rsi[stock.indicators.rsi.length - 1] || 0;
             case 'Signal Strength (Xt)': return stock.signals.vwlmStrength || 0;
             case 'Shares': return stock.signals.suggestedShares || 0;
-            case 'Spike Date': return stock.signals.volumeSpikeSignalDate;
-            case 'Crossover Date': return stock.signals.shortTermCrossBuySignalDate || stock.signals.shortTermCrossSellSignalDate || '';
-            case 'Signal Date': return stock.signals.vwlmBuySignalDate || stock.signals.vwlmSellSignalDate || '';
+            case 'Spike Date': 
+            case 'Signal Date': 
+                return stock.signals.volumeSpikeSignalDate || stock.signals.vwlmBuySignalDate || stock.signals.vwlmSellSignalDate || '';
             case 'SMA 20': return stock.indicators.sma20[stock.indicators.sma20.length - 1] || 0;
             case 'SMA 50': return stock.indicators.sma50[stock.indicators.sma50.length - 1] || 0;
+            case 'OI Build': return stock.signals.oiBuild;
+            case 'Expiry': return stock.signals.daysToExpiry;
             default: return 0;
           }
         };
@@ -72,7 +75,6 @@ const StockTable: React.FC<StockTableProps> = ({ columns, data, activeTab, onHov
   }
 
   const getRowClass = (item: ProcessedStock, activeTab: string): string => {
-      // In terminal mode, we use text colors or small indicators mostly, but subtlest background tint can work
       return '';
   }
 

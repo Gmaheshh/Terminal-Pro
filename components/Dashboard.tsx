@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { TabType, ProcessedStock, MarketRegime } from '../types';
 import Tabs from './Tabs';
@@ -12,7 +13,7 @@ interface DashboardProps {
   onRefresh: () => void;
   children: React.ReactNode;
   stocks: ProcessedStock[];
-  regime: MarketRegime | null; // Added prop
+  regime: MarketRegime | null;
   commandValue: string;
   onCommandChange: (val: string) => void;
 }
@@ -28,7 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   stocks,
   regime,
   commandValue,
-  onCommandChange
+  onCommandChange,
 }) => {
   const [time, setTime] = useState(new Date());
 

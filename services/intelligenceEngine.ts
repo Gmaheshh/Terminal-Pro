@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { ProcessedStock, SignalAlert } from '../types';
 
@@ -14,7 +15,6 @@ export const generateSignalAlerts = async (stocks: ProcessedStock[]): Promise<Si
     // 1. Filter: Only look at stocks with active signals to reduce noise and API cost
     const activeSignalStocks = stocks.filter(s => 
         s.signals.volumeSignal === 'Spike' || 
-        s.signals.shortTermCrossBuySignal || 
         s.signals.vwlmBuySignal
     );
 
@@ -26,8 +26,8 @@ export const generateSignalAlerts = async (stocks: ProcessedStock[]): Promise<Si
     // Prepare context for LLM
     const targetsInfo = targetStocks.map(s => {
         let direction = 'NEUTRAL';
-        if (s.signals.vwlmBuySignal || s.signals.shortTermCrossBuySignal) direction = 'LONG';
-        else if (s.signals.vwlmSellSignal || s.signals.shortTermCrossSellSignal) direction = 'SHORT';
+        if (s.signals.vwlmBuySignal) direction = 'LONG';
+        else if (s.signals.vwlmSellSignal) direction = 'SHORT';
         else if (s.signals.volumeSignal === 'Spike' && s.signals.trendSignal === 'Uptrend') direction = 'LONG';
 
         return { ticker: s.ticker, direction };
@@ -61,8 +61,9 @@ export const generateSignalAlerts = async (stocks: ProcessedStock[]): Promise<Si
     Ensure response is strictly a valid JSON array.`;
 
     try {
+        // FIX: Updated model to gemini-3-flash-preview for high performance search grounding
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],

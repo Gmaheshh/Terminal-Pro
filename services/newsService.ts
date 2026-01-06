@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import type { NewsResult, SearchSource } from '../types';
 
@@ -25,8 +26,9 @@ export const fetchMarketNews = async (tickers: string[]): Promise<NewsResult> =>
     Do not add markdown formatting. Just return the JSON.`;
 
     try {
+        // FIX: Updated model to gemini-3-flash-preview for search grounding tasks
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],

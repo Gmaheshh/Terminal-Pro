@@ -1,4 +1,3 @@
-
 import type { ReactNode } from 'react';
 
 export interface OHLCV {
@@ -8,7 +7,6 @@ export interface OHLCV {
   low: number;
   close: number;
   volume: number;
-  openInterest?: number;
 }
 
 export interface StockData {
@@ -44,62 +42,20 @@ export interface TechnicalIndicators {
   xt: number[];
   ema9Xt: number[];
   ema21Xt: number[];
-  bbUpper?: number[];
-  bbLower?: number[];
-  kcUpper?: number[];
-  kcLower?: number[];
-  isSqueezing?: boolean[];
-  high52Week?: number;
-  oiChangePct: number[];
-  oiSmartMoneyScore: number[];
 }
 
-export interface OptionContract {
-  strike: number;
-  price: number;
-  change: number;
-  iv: number;
-  oi: number;
-  volume: number;
-}
-
-export interface OptionChain {
-  ticker: string;
-  expiryDate: string;
-  underlyingPrice: number;
-  calls: OptionContract[];
-  puts: OptionContract[];
-}
-
-export interface DerivativeStrategy {
-  name: string;
-  description: string;
-  riskReward: string;
-  confidence: number;
-  rationale: string;
-  legs: string[];
-}
-
-export interface DerivativeMetrics {
-  totalOI: number;
-  rolloverPct: number;
-  putCallRatio: number;
-  avgIV: number;
-  maxPain: number;
-}
-
+export type SignalType = 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell' | 'Neutral';
 export type VolumeSignal = 'Spike' | 'Normal';
 export type TrendSignal = 'Uptrend' | 'Downtrend' | 'Weak';
 export type VolumeEmaSignal = 'Bullish' | 'Bearish' | 'Neutral';
 export type VolumeStatus = 'High 🔺' | 'Low 🔻' | 'Average ➖' | 'NA';
 
 export interface SignalFactors {
-    momentum: number;
-    volume: number;
-    trend: number;
-    volatility: number;
-    institutional: number;
-    dominantFactor: 'MOMENTUM' | 'VOLUME' | 'TREND' | 'VOLATILITY' | 'INSTITUTIONAL' | 'BALANCED';
+    momentum: number; // 0-100
+    volume: number;   // 0-100
+    trend: number;    // 0-100
+    volatility: number; // 0-100
+    dominantFactor: 'MOMENTUM' | 'VOLUME' | 'TREND' | 'VOLATILITY' | 'BALANCED';
 }
 
 export type AlertImpact = 'CONFIRMING' | 'THREATENING' | 'NEUTRAL';
@@ -123,10 +79,7 @@ export interface Signals {
   volumeStatus: VolumeStatus;
   priceAboveEma10: boolean;
   suggestedShares?: number;
-  distFrom52WHigh?: number;
-  oiBuild: number;
-  expiryDate: string;
-  daysToExpiry: number;
+  
   vwlmBuySignal: boolean;
   vwlmBuySignalDate: string;
   vwlmSellSignal: boolean;
@@ -134,15 +87,18 @@ export interface Signals {
   vwlmStrength: number;
   vwlmStopLoss?: number;
   vwlmTarget?: number;
+
+  // Factor Attribution
   factors: SignalFactors;
 }
+
 
 export interface ProcessedStock {
   ticker: string;
   data: StockData;
   indicators: TechnicalIndicators;
   signals: Signals;
-  intelligence?: SignalAlert[];
+  intelligence?: SignalAlert[]; // Added intelligence field
 }
 
 export interface SearchSource {
@@ -160,7 +116,7 @@ export interface TechnicalInsight {
     thesis: string;
     outlook: 'Bullish' | 'Bearish' | 'Neutral';
     keyFactors: string[];
-    confidenceScore: number;
+    confidenceScore: number; // 0-100
 }
 
 export interface NewsItem {
@@ -182,8 +138,8 @@ export interface Trade {
   entryPrice: number;
   exitDate: string;
   exitPrice: number;
-  pnl: number; 
-  tradeRoI: number;
+  pnl: number; // Profit/Loss in currency
+  tradeRoI: number; // This is return on investment for the trade
   shares: number;
   entryCapital: number;
   exitCapital: number;
@@ -206,10 +162,9 @@ export interface PortfolioBacktestResult {
   initialCapital: number;
   finalCapital: number;
   equityCurve: EquityPoint[];
-  isBenchmark?: boolean;
 }
 
-export type TabType = 'Volume/Trend' | 'VWLM' | 'Derivatives Desk' | 'Portfolio Simulation' | 'Strategy Backtester' | 'Recent News' | 'User Manual';
+export type TabType = 'Volume/Trend' | 'VWLM' | 'Portfolio Simulation' | 'Strategy Backtester' | 'User Manual' | 'Recent News';
 
 export interface Column<T> {
   header: string;
@@ -239,17 +194,6 @@ export interface EmaSignalResult {
     rsi: number;
     stochRsi: number;
     atr: number;
-}
-
-export interface ArbitrageOpportunity {
-    ticker: string;
-    baseName: string;
-    nsePrice: number;
-    bsePrice: number;
-    spread: number;
-    spreadPct: number;
-    signal: 'BUY_NSE_SELL_BSE' | 'BUY_BSE_SELL_NSE' | 'NEUTRAL';
-    timestamp: string;
 }
 
 export interface CoachInsight {

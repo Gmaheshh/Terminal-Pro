@@ -1,5 +1,5 @@
 {
-  "name": "stock-super-scanner",
+  "name": "gp-alpha-by-growth-prospect-investments",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,7 +12,7 @@
     "react-dom": "^19.2.0",
     "react": "^19.2.0",
     "@google/genai": "^1.25.0",
-    "lightweight-charts": "4.1.1"
+    "lightweight-charts": "5.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
