@@ -1,15 +1,17 @@
+
 import React from 'react';
 import type { SignalAlert } from '../types';
-import { RefreshCwIcon } from './Icons';
+import { RefreshCwIcon, XIcon } from './Icons';
 import { Loader } from './Loader';
 
 interface AlertFeedProps {
     alerts: SignalAlert[];
     loading: boolean;
     onRefresh: () => void;
+    onClose?: () => void;
 }
 
-const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, loading, onRefresh }) => {
+const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, loading, onRefresh, onClose }) => {
     
     const getImpactStyle = (impact: string) => {
         switch (impact) {
@@ -34,13 +36,25 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, loading, onRefresh }) => 
         <div className="fixed bottom-12 left-4 z-40 w-[400px] max-h-[400px] overflow-hidden flex flex-col font-mono text-xs shadow-2xl border border-bb-border bg-bb-black hidden xl:flex">
             <div className="bg-bb-dark p-2 border-b border-bb-orange flex justify-between items-center">
                 <span className="font-bold text-bb-orange uppercase tracking-wider">INTEL_ENGINE // SIGNAL_ALERTS</span>
-                <button 
-                    onClick={onRefresh} 
-                    disabled={loading}
-                    className="hover:text-white text-bb-muted transition-colors"
-                >
-                    {loading ? <Loader className="w-3 h-3" /> : <RefreshCwIcon className="w-3 h-3" />}
-                </button>
+                <div className="flex items-center space-x-3">
+                    <button 
+                        onClick={onRefresh} 
+                        disabled={loading}
+                        className="hover:text-white text-bb-muted transition-colors"
+                        title="Refresh Intelligence Scan"
+                    >
+                        {loading ? <Loader className="w-3 h-3" /> : <RefreshCwIcon className="w-3 h-3" />}
+                    </button>
+                    {onClose && (
+                        <button 
+                            onClick={onClose}
+                            className="hover:text-white text-bb-muted transition-colors"
+                            title="Dismiss Popup"
+                        >
+                            <XIcon className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
             </div>
             
             <div className="overflow-y-auto custom-scrollbar flex-1 p-2 space-y-2">

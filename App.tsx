@@ -23,6 +23,8 @@ import LoadingGame from './components/LoadingGame';
 import TickerTape from './components/TickerTape';
 import AlertFeed from './components/AlertFeed';
 
+// Removed redundant declare global to avoid conflict with predefined AIStudio type.
+
 const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Initializing GP Alpha Terminal...');
@@ -33,6 +35,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('Volume/Trend');
   const [commandValue, setCommandValue] = useState('');
   
+  const [hasPaidKey, setHasPaidKey] = useState(false);
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   const [analysisActiveTab, setAnalysisActiveTab] = useState<'sentiment' | 'thesis'>('sentiment');
   const [modalTicker, setModalTicker] = useState<string | null>(null);
@@ -43,6 +46,7 @@ const App: React.FC = () => {
 
   const [signalAlerts, setSignalAlerts] = useState<SignalAlert[]>([]);
   const [isAlertsLoading, setIsAlertsLoading] = useState(false);
+  const [isAlertsVisible, setIsAlertsVisible] = useState(true);
 
   const [sentiments, setSentiments] = useState<Record<string, Sentiment>>({});
   const [theses, setTheses] = useState<Record<string, TechnicalInsight>>({});
@@ -52,6 +56,27 @@ const App: React.FC = () => {
   const [modalBacktestData, setModalBacktestData] = useState<PortfolioBacktestResult | null>(null);
 
   const [hoveredStock, setHoveredStock] = useState<ProcessedStock | null>(null);
+
+  // Check for paid key on mount
+  useEffect(() => {
+    const checkKey = async () => {
+      // Use any cast to check for existence of aistudio if the global interface is not yet picked up by TS
+      if ((window as any).aistudio) {
+        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+        setHasPaidKey(hasKey);
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleSelectApiKey = async () => {
+    if ((window as any).aistudio) {
+      await (window as any).aistudio.openSelectKey();
+      setHasPaidKey(true);
+      // Immediately retry some logic or simply refresh UI
+      scanStocks();
+    }
+  };
 
   const scanStocks = useCallback(async () => {
     setLoading(true);
@@ -146,8 +171,12 @@ const App: React.FC = () => {
                 setTheses(prev => ({ ...prev, [ticker]: result }));
             }
         }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to fetch ${type}:`, error);
+      if (error?.message?.includes('429') || error?.message?.includes('RESOURCE_EXHAUSTED')) {
+          // If we hit 429, suggest selecting a paid key
+          setErrorCount(prev => prev + 1);
+      }
     } finally {
       setIsAnalysisLoading(false);
     }
@@ -186,6 +215,7 @@ const App: React.FC = () => {
       else if (upperVal === 'VOL') setActiveTab('Volume/Trend');
       else if (upperVal === 'VWLM') setActiveTab('VWLM');
       else if (upperVal === 'OPT' || upperVal === 'DER') setActiveTab('Derivatives Desk');
+      else if (upperVal === 'ALERTS' || upperVal === 'INTEL') setIsAlertsVisible(true);
   };
 
   const filteredData = useMemo(() => {
@@ -202,7 +232,7 @@ const App: React.FC = () => {
 
     if (commandValue.length > 0) {
         const search = commandValue.toUpperCase();
-        const keywords = ['NEWS', 'SIM', 'PORT', 'STRAT', 'BACK', 'HELP', 'MAN', 'VOL', 'VWLM', 'OPT', 'DER'];
+        const keywords = ['NEWS', 'SIM', 'PORT', 'STRAT', 'BACK', 'HELP', 'MAN', 'VOL', 'VWLM', 'OPT', 'DER', 'ALERTS', 'INTEL'];
         if (!keywords.includes(search)) {
              data = data.filter(s => s.ticker.includes(search));
         }
@@ -270,6 +300,8 @@ const App: React.FC = () => {
         regime={marketRegime}
         commandValue={commandValue}
         onCommandChange={handleCommandChange}
+        hasPaidKey={hasPaidKey}
+        onSelectApiKey={handleSelectApiKey}
       >
         <div className="h-full overflow-auto custom-scrollbar">
             {renderContent()}
@@ -278,11 +310,14 @@ const App: React.FC = () => {
       
       <TickerTape stocks={processedStocks} />
       
-      <AlertFeed 
-         alerts={signalAlerts} 
-         loading={isAlertsLoading} 
-         onRefresh={() => runIntelligenceScan(processedStocks)}
-      />
+      {isAlertsVisible && (
+        <AlertFeed 
+          alerts={signalAlerts} 
+          loading={isAlertsLoading} 
+          onRefresh={() => runIntelligenceScan(processedStocks)}
+          onClose={() => setIsAlertsVisible(false)}
+        />
+      )}
 
       {hoveredStock && !['Portfolio Simulation', 'Strategy Backtester', 'User Manual', 'Recent News', 'Derivatives Desk'].includes(activeTab) && (
         <div className="fixed bottom-12 right-4 z-50 w-[450px] h-[300px] bg-bb-black border border-bb-orange shadow-[0_0_15px_rgba(255,153,0,0.15)] animate-fade-in hidden lg:block">
@@ -306,6 +341,7 @@ const App: React.FC = () => {
         activeTab={analysisActiveTab}
         setActiveTab={setAnalysisActiveTab}
         isLoading={isAnalysisLoading}
+        onUpgradeRequested={handleSelectApiKey}
       />
       <BacktestDetailsModal 
         isOpen={isBacktestModalOpen}
