@@ -1,4 +1,3 @@
-
 import type { OHLCV, TechnicalIndicators, Signals } from '../types';
 import { calculateFactorAttribution } from './factorAttributionService';
 
@@ -12,42 +11,25 @@ const createOhlcvCacheKey = (data: OHLCV[]): string => {
     return `len:${data.length}-start:${first.date}/${first.close}-end:${last.date}/${last.close}`;
 };
 
-/**
- * Helper to find the last Thursday of a given month
- */
 const getLastThursday = (year: number, month: number): Date => {
-    const lastDay = new Date(year, month + 1, 0); // Last day of month
-    let day = lastDay.getDay(); // 0 = Sunday, 1 = Monday, ..., 4 = Thursday
+    const lastDay = new Date(year, month + 1, 0);
+    let day = lastDay.getDay(); 
     let diff = (day >= 4) ? (day - 4) : (day + 3);
     return new Date(year, month + 1, 0 - diff);
 };
 
-/**
- * Calculates the next F&O expiry date (Last Thursday of the month)
- */
 const getNextExpiryInfo = (currentDate: Date) => {
     let year = currentDate.getFullYear();
     let month = currentDate.getMonth();
-    
     let expiry = getLastThursday(year, month);
-    
-    // If current date is past this month's expiry, move to next month
     if (currentDate.getTime() > expiry.getTime()) {
         month += 1;
-        if (month > 11) {
-            month = 0;
-            year += 1;
-        }
+        if (month > 11) { month = 0; year += 1; }
         expiry = getLastThursday(year, month);
     }
-    
     const diffTime = expiry.getTime() - currentDate.getTime();
-    const daysToExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return {
-        expiryDate: expiry.toISOString().split('T')[0],
-        daysToExpiry: daysToExpiry >= 0 ? daysToExpiry : 0
-    };
+    const daysToExpiry = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    return { expiryDate: expiry.toISOString().split('T')[0], daysToExpiry: daysToExpiry };
 };
 
 export const calculateEMA = (data: number[], period: number): number[] => {
@@ -94,8 +76,8 @@ export const calculateATR = (data: OHLCV[], period = 14): number[] => {
         const tr3 = Math.abs(data[i].low - data[i-1].close);
         trs.push(Math.max(tr1, tr2, tr3));
     }
-    const atr = calculateEMA(trs, period);
-    return [NaN, ...atr];
+    const ema = calculateEMA(trs, period);
+    return [NaN, ...ema];
 };
 
 export const calculateADX = (data: OHLCV[], period = 14) => {
@@ -120,20 +102,20 @@ export const calculateADX = (data: OHLCV[], period = 14) => {
     const atr = calculateEMA(trs, period);
     const sdmPlus = calculateEMA(plusDMs, period);
     const sdmMinus = calculateEMA(minusDMs, period);
-    const plusDI = [];
-    const minusDI = [];
-    for (let i = period - 1; i < sdmPlus.length; i++) {
-        plusDI.push((sdmPlus[i] / (atr[i] || 1)) * 100);
-        minusDI.push((sdmMinus[i] / (atr[i] || 1)) * 100);
+    const plusDI: number[] = Array(data.length).fill(NaN);
+    const minusDI: number[] = Array(data.length).fill(NaN);
+    for (let i = 0; i < sdmPlus.length; i++) {
+        const idx = i + 1;
+        plusDI[idx] = (sdmPlus[i] / (atr[i] || 1)) * 100;
+        minusDI[idx] = (sdmMinus[i] / (atr[i] || 1)) * 100;
     }
-    const dxs = [];
+    const dxs: number[] = [];
     for (let i = 0; i < plusDI.length; i++) {
-        const sum = plusDI[i] + minusDI[i];
-        dxs.push(sum === 0 ? 0 : (Math.abs(plusDI[i] - minusDI[i]) / sum) * 100);
+        const sum = (plusDI[i] || 0) + (minusDI[i] || 0);
+        dxs.push(sum === 0 ? 0 : (Math.abs((plusDI[i] || 0) - (minusDI[i] || 0)) / sum) * 100);
     }
     const adx = calculateEMA(dxs, period);
-    const padding = Array(data.length - adx.length).fill(NaN);
-    return { adx: [...padding, ...adx], plusDI: [...padding, ...plusDI], minusDI: [...padding, ...minusDI] };
+    return { adx: adx, plusDI: plusDI, minusDI: minusDI };
 };
 
 const calculateRMA = (data: number[], period: number): number[] => {
@@ -152,9 +134,7 @@ const calculateRMA = (data: number[], period: number): number[] => {
 const calculateRSI = (data: number[], period = 14): number[] => {
     if (data.length < period + 1) return Array(data.length).fill(NaN);
     const deltas: number[] = [];
-    for (let i = 1; i < data.length; i++) {
-        deltas.push(data[i] - data[i - 1]);
-    }
+    for (let i = 1; i < data.length; i++) { deltas.push(data[i] - data[i - 1]); }
     const gains = deltas.map(d => d > 0 ? d : 0);
     const losses = deltas.map(d => d < 0 ? -d : 0);
     const avgGain = calculateRMA(gains, period);
@@ -170,62 +150,53 @@ const calculateRSI = (data: number[], period = 14): number[] => {
 export const calculateIndicators = (data: OHLCV[]): TechnicalIndicators => {
     const cacheKey = createOhlcvCacheKey(data);
     if (indicatorsCache.has(cacheKey)) return indicatorsCache.get(cacheKey)!;
-
     const volumes = data.map(d => d.volume);
     const closes = data.map(d => d.close);
     const ois = data.map(d => d.openInterest || 0);
     const atr = calculateATR(data, 14);
     const atr7 = calculateATR(data, 7);
-    const { adx, plusDI, minusDI } = calculateADX(data, 14);
+    const adxRes = calculateADX(data, 14);
+    const ema9 = calculateEMA(closes, 9);
+    const ema10 = calculateEMA(closes, 10);
+    const ema13 = calculateEMA(closes, 13);
     const sma20 = calculateSMA(closes, 20);
     const sma50 = calculateSMA(closes, 50);
     const sma200 = calculateSMA(closes, 200);
     const ema200 = calculateEMA(closes, 200);
-    const ema9 = calculateEMA(closes, 9);
-    const ema10 = calculateEMA(closes, 10);
-    const ema13 = calculateEMA(closes, 13);
     const rsi = calculateRSI(closes);
-
     const bbUpper = sma20.map((m, i) => {
         if (isNaN(m)) return NaN;
         const slice = closes.slice(Math.max(0, i-19), i+1);
         const std = Math.sqrt(slice.reduce((s, c) => s + Math.pow(c - m, 2), 0) / 20);
         return m + (std * 2);
     });
-    
     const kcUpper = sma20.map((m, i) => m + (atr[i] * 1.5));
     const isSqueezing = bbUpper.map((u, i) => u < (kcUpper[i] || 0));
-    
-    const oiChangePct: number[] = Array(5).fill(0);
+    const oiChangePct: number[] = Array(Math.min(data.length, 5)).fill(0);
     for (let i = 5; i < ois.length; i++) {
         const prevOi = ois[i-1] || 1;
         oiChangePct.push(((ois[i] - prevOi) / prevOi) * 100);
     }
-
-    const rvol: number[] = Array(20).fill(NaN);
+    const rvol: number[] = Array(Math.min(data.length, 20)).fill(NaN);
     for (let i = 20; i < volumes.length; i++) {
         const avg = volumes.slice(i - 20, i).reduce((sum, v) => sum + v, 0) / 20;
         rvol.push(avg > 0 ? volumes[i] / avg : 0);
     }
-
-    const logReturns: number[] = [NaN];
-    for(let i=1; i<closes.length; i++) {
-        if(closes[i-1] > 0) logReturns.push(Math.log(closes[i] / closes[i-1]));
-        else logReturns.push(NaN);
-    }
+    const logReturns: number[] = closes.map((c, i) => i > 0 && closes[i-1] > 0 ? Math.log(c / closes[i-1]) : NaN);
     const xt = logReturns.map((lr, i) => lr * (rvol[i] || 0));
-    const ema9Xt = calculateEMA(xt, 9);
-    const ema21Xt = calculateEMA(xt, 21);
-
+    const ema9Xt = calculateEMA(xt.map(v => isNaN(v) ? 0 : v), 9);
+    const ema21Xt = calculateEMA(xt.map(v => isNaN(v) ? 0 : v), 21);
     const volatilityPct = atr.map((val, i) => (closes[i] ? (val / closes[i]) * 100 : 0));
-
+    const high52Week = Math.max(...data.map(d => d.high).slice(-252));
     const indicators: TechnicalIndicators = {
-        atr, atr7, adx, plusDI, minusDI, avgVolume: volumes.slice(-20).reduce((a,b)=>a+b,0)/20, rvol, volatilityPct,
-        volEma5: calculateEMA(volumes, 5), volEma20: calculateEMA(volumes, 20), ema9, ema10, ema13, ema200, 
-        macdLine: [], macdSignal: [], rsi, stochRsi: [], sma20, sma50, sma200, obv: [], avdm: [],
-        xt, ema9Xt, ema21Xt, bbUpper, kcUpper, isSqueezing, oiChangePct, oiSmartMoneyScore: []
+        atr: atr, atr7: atr7, adx: adxRes.adx, plusDI: adxRes.plusDI, minusDI: adxRes.minusDI,
+        avgVolume: volumes.slice(-20).reduce((a,b) => a+b, 0) / Math.min(20, volumes.length),
+        rvol: rvol, volatilityPct: volatilityPct, volEma5: calculateEMA(volumes, 5),
+        volEma20: calculateEMA(volumes, 20), ema9: ema9, ema10: ema10, ema13: ema13, ema200: ema200,
+        macdLine: [], macdSignal: [], rsi: rsi, stochRsi: [], sma20: sma20, sma50: sma50, sma200: sma200,
+        obv: [], avdm: [], xt: xt, ema9Xt: ema9Xt, ema21Xt: ema21Xt, bbUpper: bbUpper, kcUpper: kcUpper,
+        isSqueezing: isSqueezing, oiChangePct: oiChangePct, oiSmartMoneyScore: [], high52Week: high52Week
     };
-
     indicatorsCache.set(cacheKey, indicators);
     return indicators;
 };
@@ -233,39 +204,32 @@ export const calculateIndicators = (data: OHLCV[]): TechnicalIndicators => {
 export const generateSignals = (indicators: TechnicalIndicators, historical: OHLCV[]): Signals => {
     const lastIndex = historical.length - 1;
     const currentData = historical[lastIndex];
-
     const rvol = indicators.rvol[lastIndex] || 0;
     const adx = indicators.adx[lastIndex] || 0;
     const plusDI = indicators.plusDI[lastIndex] || 0;
     const minusDI = indicators.minusDI[lastIndex] || 0;
     const ema10 = indicators.ema10[lastIndex] || 0;
-
     let volumeSignal: 'Spike' | 'Normal' = 'Normal';
     let volumeSpikeSignalDate = '';
-    for (let i = lastIndex; i >= Math.max(0, lastIndex - 55); i--) {
+    for (let i = lastIndex; i >= Math.max(0, lastIndex - 21); i--) {
         if (indicators.rvol[i] > 3) {
             volumeSignal = 'Spike';
             volumeSpikeSignalDate = historical[i].date;
             break;
         }
     }
-
     let trendSignal: 'Uptrend' | 'Downtrend' | 'Weak' = 'Weak';
     if (adx > 25) {
         if (plusDI > minusDI) trendSignal = 'Uptrend';
         else if (minusDI > plusDI) trendSignal = 'Downtrend';
     }
-
     const oiBuild = indicators.oiChangePct[lastIndex] || 0;
     const atr7 = indicators.atr7[lastIndex] || 1;
-    const stopLoss = currentData.close - (3 * atr7);
-    const risk = currentData.close - stopLoss;
-    const target = currentData.close + (2 * risk);
-
+    const stopLoss = trendSignal === 'Downtrend' ? currentData.close + (3 * atr7) : currentData.close - (3 * atr7);
+    const risk = Math.abs(currentData.close - stopLoss);
+    const target = trendSignal === 'Downtrend' ? currentData.close - (2 * risk) : currentData.close + (2 * risk);
     let vwlmBuy = false;
     let vwlmBuyDate = '';
-    let vwlmSell = false;
-    let vwlmSellDate = '';
     for (let i = lastIndex; i >= Math.max(21, lastIndex - 5); i--) {
         const ema9Xt = indicators.ema9Xt[i] || 0;
         const ema21Xt = indicators.ema21Xt[i] || 0;
@@ -277,30 +241,19 @@ export const generateSignals = (indicators: TechnicalIndicators, historical: OHL
             break;
         }
     }
-
-    const factors = calculateFactorAttribution(indicators, historical);
-    
-    // Calculate Expiry Info
     const { expiryDate, daysToExpiry } = getNextExpiryInfo(new Date());
-
+    const high52Week = indicators.high52Week || currentData.close;
+    const distFrom52WHigh = ((high52Week - currentData.close) / high52Week) * 100;
     return {
-        volumeSignal,
-        trendSignal,
-        volumeEmaSignal: 'Neutral',
-        volumeSpikeSignalDate,
-        stopLoss,
-        target,
-        volumeStatus: rvol > 1.5 ? 'High 🔺' : 'Average ➖',
+        volumeSignal: volumeSignal, trendSignal: trendSignal, volumeEmaSignal: 'Neutral',
+        volumeSpikeSignalDate: volumeSpikeSignalDate, stopLoss: stopLoss, target: target,
+        volumeStatus: rvol > 1.5 ? 'High 🔺' : rvol < 0.5 ? 'Low 🔻' : 'Average ➖',
         priceAboveEma10: currentData.close > ema10,
         suggestedShares: risk > 0 ? Math.floor(UI_SUGGESTED_RISK_CAPITAL / risk) : 0,
-        oiBuild,
-        expiryDate,
-        daysToExpiry,
-        vwlmBuySignal: vwlmBuy,
-        vwlmBuySignalDate: vwlmBuyDate,
-        vwlmSellSignal: vwlmSell,
-        vwlmSellSignalDate: vwlmSellDate,
-        vwlmStrength: indicators.xt[lastIndex] || 0,
-        factors
+        oiBuild: oiBuild, expiryDate: expiryDate, daysToExpiry: daysToExpiry,
+        vwlmBuySignal: vwlmBuy, vwlmBuySignalDate: vwlmBuyDate, vwlmSellSignal: false,
+        vwlmSellSignalDate: '', vwlmStrength: indicators.xt[lastIndex] || 0,
+        factors: calculateFactorAttribution(indicators, historical),
+        distFrom52WHigh: distFrom52WHigh
     };
 };

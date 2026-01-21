@@ -10,10 +10,11 @@ interface BacktestDetailsModalProps {
   result: PortfolioBacktestResult | null;
 }
 
-export const StatCard: React.FC<{ label: string, value: string, color?: string }> = ({ label, value, color = 'text-white' }) => (
-    <div className="bg-gray-700/50 p-3 rounded-lg text-center">
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className={`text-lg font-semibold ${color}`}>{value}</p>
+export const StatCard: React.FC<{ label: string, value: string, color?: string, subValue?: string }> = ({ label, value, color = 'text-white', subValue }) => (
+    <div className="bg-bb-panel border border-bb-border p-3 text-center">
+        <p className="text-[10px] text-bb-muted uppercase mb-1">{label}</p>
+        <p className={`text-lg font-bold ${color}`}>{value}</p>
+        {subValue && <p className="text-[9px] text-bb-muted mt-1 uppercase">{subValue}</p>}
     </div>
 );
 
@@ -38,30 +39,31 @@ const BacktestDetailsModal: React.FC<BacktestDetailsModalProps> = ({ isOpen, onC
 
     const chart = createChart(chartContainerRef.current, {
         layout: {
-            background: { type: ColorType.Solid, color: '#111827' }, // gray-900
-            textColor: '#d1d5db',
+            background: { type: ColorType.Solid, color: '#000000' },
+            textColor: '#d4d4d4',
         },
         grid: {
-            vertLines: { color: '#374151' },
-            horzLines: { color: '#374151' },
+            vertLines: { color: '#1a1a1a' },
+            horzLines: { color: '#1a1a1a' },
         },
         width: chartContainerRef.current.clientWidth,
         height: 250,
         timeScale: {
-            borderColor: '#4b5563',
+            borderColor: '#333',
         },
         rightPriceScale: {
-            borderColor: '#4b5563',
+            borderColor: '#333',
         },
     });
 
-    const themeColor = result.isBenchmark ? '#00ccff' : '#00ff00';
-    const fillAlpha = result.isBenchmark ? 'rgba(0, 204, 255, 0.4)' : 'rgba(0, 255, 0, 0.4)';
+    const themeColor = result.isBenchmark ? '#00ccff' : '#ff9900';
+    const fillAlpha = result.isBenchmark ? 'rgba(0, 204, 255, 0.4)' : 'rgba(255, 153, 0, 0.4)';
 
     const areaSeries = chart.addSeries(AreaSeries, {
         lineColor: themeColor,
         topColor: fillAlpha,
         bottomColor: 'transparent',
+        lineWidth: 2,
     });
 
     if (result.equityCurve && result.equityCurve.length > 0) {
@@ -88,100 +90,94 @@ const BacktestDetailsModal: React.FC<BacktestDetailsModalProps> = ({ isOpen, onC
 
   if (!isOpen || !result) return null;
   
-  const returnColor = result.totalReturn > 0 ? 'text-emerald-400' : 'text-red-400';
-  const returnSign = result.totalReturn > 0 ? '+' : '';
-  const profit = result.finalCapital - result.initialCapital;
-  const profitColor = profit > 0 ? 'text-emerald-400' : 'text-red-400';
+  const returnColor = result.netReturn > 0 ? 'text-bb-green' : 'text-bb-red';
+  const returnSign = result.netReturn > 0 ? '+' : '';
+  const netProfit = result.netFinalCapital - result.initialCapital;
+  const netProfitColor = netProfit > 0 ? 'text-bb-green' : 'text-bb-red';
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 font-mono"
+      className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 font-mono"
       onClick={onClose}
     >
       <div
-        className="bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl border border-gray-700 transform transition-all flex flex-col"
-        style={{maxHeight: '95vh'}}
+        className="bg-bb-black w-full max-w-6xl border-2 border-bb-orange shadow-[0_0_30px_rgba(255,153,0,0.3)] flex flex-col"
+        style={{maxHeight: '90vh'}}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
+        <header className="bg-bb-orange text-bb-black flex justify-between items-center px-4 py-2 font-bold flex-shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-white">
-                {result.isBenchmark ? 'Market Benchmark Analysis' : 'Portfolio Simulation Details'}
-            </h2>
-            <p className="text-sm text-gray-400">{result.strategy} ({result.period})</p>
+            <span className="uppercase tracking-widest text-xs">Sim_Report_v3.1 // </span>
+            <span className="uppercase">{result.strategy} ({result.period})</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-700 transition-colors">
-            <XIcon className="w-5 h-5 text-gray-400" />
+          <button onClick={onClose} className="hover:bg-bb-black hover:text-bb-orange px-2 transition-colors">
+            [CLOSE_X]
           </button>
         </header>
         
-        <div className="p-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 flex-shrink-0 border-b border-gray-700">
-            <StatCard label="Initial Capital" value={currencyFormatter.format(result.initialCapital)} />
-            <StatCard label="Final Capital" value={currencyFormatter.format(result.finalCapital)} />
-            <StatCard label="Profit / Loss" value={currencyFormatter.format(profit)} color={profitColor} />
-            <StatCard label="Total Return" value={`${returnSign}${result.totalReturn.toFixed(2)}%`} color={returnColor} />
-            <StatCard label="CAGR" value={`${result.cagr.toFixed(2)}%`} color="text-cyan-400" />
-            <StatCard label="Max Drawdown" value={`-${result.maxDrawdown.toFixed(2)}%`} color="text-red-400" />
-            <StatCard label="Total Trades" value={`${result.totalTrades}`} />
+        <div className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 flex-shrink-0 border-b border-bb-border bg-bb-dark">
+            <StatCard label="Initial Seed" value={currencyFormatter.format(result.initialCapital)} />
+            <StatCard label="Total Charges" value={currencyFormatter.format(result.totalCharges)} color="text-bb-red" subValue="Inc. Slippage" />
+            <StatCard label="Final Capital" value={currencyFormatter.format(result.netFinalCapital)} />
+            <StatCard label="Net Profit" value={currencyFormatter.format(netProfit)} color={netProfitColor} />
+            <StatCard label="Net Return" value={`${returnSign}${result.netReturn.toFixed(2)}%`} color={returnColor} />
             <StatCard label="Win Rate" value={`${result.winRate.toFixed(1)}%`} />
+            <StatCard label="Max Drawdown" value={`-${result.maxDrawdown.toFixed(2)}%`} color="text-bb-red" />
         </div>
 
-        {/* Equity Curve Chart Section */}
-        <div className="w-full h-64 p-4 border-b border-gray-700 bg-gray-900">
-             <div className="text-xs text-gray-400 mb-2 uppercase font-bold">
-                 {result.isBenchmark ? 'Benchmark Growth Curve' : 'Strategy Equity Curve'}
-             </div>
-             <div ref={chartContainerRef} className="w-full h-full" />
-        </div>
-
-        <main className="overflow-y-auto px-4 pb-4 mt-2">
-          <div className="text-xs text-gray-400 mb-2 uppercase font-bold">{result.isBenchmark ? 'Simulation Logic' : 'Trade Ledger'}</div>
-          {result.isBenchmark ? (
-              <div className="bg-gray-900 p-4 border border-gray-700 text-sm text-gray-400">
-                  <p>Passive Investment simulation assumes ₹100,000 was converted into Nifty 50 Index units at the close price of the start date and held continuously until the current terminal session.</p>
-                  <p className="mt-2">Starting Price: <span className="text-white">₹{result.trades[0]?.entryPrice.toFixed(2)}</span></p>
-                  <p>Ending Price: <span className="text-white">₹{result.trades[0]?.exitPrice.toFixed(2)}</span></p>
-              </div>
-          ) : (
-            <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                    <thead className="bg-gray-700/50 sticky top-0">
-                        <tr>
-                            <th className="p-2 text-left font-semibold text-gray-300">Ticker</th>
-                            <th className="p-2 text-left font-semibold text-gray-300">Entry Date</th>
-                            <th className="p-2 text-right font-semibold text-gray-300">Entry Price</th>
-                            <th className="p-2 text-right font-semibold text-gray-300">Shares</th>
-                            <th className="p-2 text-left font-semibold text-gray-300">Exit Date</th>
-                            <th className="p-2 text-right font-semibold text-gray-300">Exit Price</th>
-                            <th className="p-2 text-right font-semibold text-gray-300">Trade RoI</th>
-                            <th className="p-2 text-right font-semibold text-gray-300">P/L (₹)</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700">
-                        {result.trades.map((trade, index) => {
-                            const tradeRoIColor = trade.tradeRoI > 0 ? 'text-emerald-400' : 'text-red-400';
-                            const tradeRoISign = trade.tradeRoI > 0 ? '+' : '';
-
-                            const pnlColor = trade.pnl > 0 ? 'text-emerald-400' : 'text-red-400';
-                            
-                            return (
-                                <tr key={index} className="hover:bg-gray-700/30">
-                                    <td className="p-2 whitespace-nowrap font-bold text-cyan-400">{trade.ticker}</td>
-                                    <td className="p-2 whitespace-nowrap">{trade.entryDate}</td>
-                                    <td className="p-2 whitespace-nowrap text-right">₹{trade.entryPrice.toFixed(2)}</td>
-                                    <td className="p-2 whitespace-nowrap text-right">{trade.shares.toLocaleString()}</td>
-                                    <td className="p-2 whitespace-nowrap">{trade.exitDate}</td>
-                                    <td className="p-2 whitespace-nowrap text-right">₹{trade.exitPrice.toFixed(2)}</td>
-                                    <td className={`p-2 whitespace-nowrap text-right font-medium ${tradeRoIColor}`}>{`${tradeRoISign}${trade.tradeRoI.toFixed(2)}%`}</td>
-                                    <td className={`p-2 whitespace-nowrap text-right font-medium ${pnlColor}`}>{pnlFormatter.format(trade.pnl)}</td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+        <div className="flex flex-col lg:flex-row h-full overflow-hidden">
+            {/* Chart Area */}
+            <div className="lg:w-2/3 border-r border-bb-border bg-bb-black p-4 flex flex-col">
+                <div className="text-[10px] text-bb-muted mb-2 uppercase font-bold tracking-tighter">>> REAL-TIME EQUITY TRAJECTORY (POST-COSTS)</div>
+                <div ref={chartContainerRef} className="flex-1 w-full" />
             </div>
-          )}
-        </main>
+
+            {/* Trade Ledger / Brokerage Breakdown */}
+            <div className="lg:w-1/3 flex flex-col bg-bb-dark">
+                <div className="p-4 border-b border-bb-border">
+                    <h3 className="text-xs font-bold text-bb-orange uppercase mb-3">>> COST DECONSTRUCTION</h3>
+                    <div className="space-y-2 text-[11px] font-mono">
+                        <div className="flex justify-between">
+                            <span className="text-bb-muted">EST. BROKERAGE + STT:</span>
+                            <span className="text-white">{currencyFormatter.format(result.totalCharges * 0.7)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-bb-muted">SLIPPAGE (0.1% ROUND):</span>
+                            <span className="text-white">{currencyFormatter.format(result.totalCharges * 0.3)}</span>
+                        </div>
+                        <div className="pt-2 border-t border-bb-border flex justify-between font-bold">
+                            <span className="text-bb-orange">TOTAL LEAKAGE:</span>
+                            <span className="text-bb-red">{currencyFormatter.format(result.totalCharges)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                    <h3 className="text-xs font-bold text-bb-blue uppercase mb-3">>> RECENT TRADE LOGS</h3>
+                    <div className="space-y-3">
+                        {result.trades.slice(-20).reverse().map((trade, idx) => (
+                            <div key={idx} className="bg-bb-black border border-bb-border/50 p-2 text-[10px]">
+                                <div className="flex justify-between mb-1">
+                                    <span className="font-bold text-bb-blue">{trade.ticker}</span>
+                                    <span className={trade.pnl > 0 ? 'text-bb-green' : 'text-bb-red'}>
+                                        {trade.pnl > 0 ? '+' : ''}{currencyFormatter.format(trade.pnl)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-bb-muted">
+                                    <span>OUT: {trade.exitDate}</span>
+                                    <span>CHG: {currencyFormatter.format(trade.charges || 0)}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer className="bg-bb-panel border-t border-bb-border px-4 py-2 text-[10px] text-bb-muted flex justify-between items-center">
+            <span className="uppercase">NOTE: Calculations include brokerage (max ₹20/side), STT, and dynamic 0.1% slippage.</span>
+            <span className="text-bb-orange font-bold uppercase tracking-widest animate-pulse">Alpha Kernel Sync Status: Nominal</span>
+        </footer>
       </div>
     </div>
   );

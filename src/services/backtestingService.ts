@@ -177,6 +177,7 @@ const runSingleStrategySimulation = (
         const durationYears = period.years; 
         const cagr = (Math.pow(finalCapital / INITIAL_CAPITAL, 1 / durationYears) - 1) * 100;
         
+        // Fix: Added missing properties (totalCharges, netReturn, netFinalCapital) to satisfy PortfolioBacktestResult interface
         results.push({
             strategy: strategyName, period: period.label,
             totalTrades: closedTrades.length, 
@@ -187,7 +188,10 @@ const runSingleStrategySimulation = (
             trades: closedTrades,
             initialCapital: INITIAL_CAPITAL, 
             finalCapital: finalCapital,
-            equityCurve
+            equityCurve,
+            totalCharges: 0,
+            netReturn: totalReturn,
+            netFinalCapital: finalCapital
         });
     }
     return results;

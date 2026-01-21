@@ -68,7 +68,7 @@ export const PortfolioSimulationDashboard: React.FC<PortfolioSimulationDashboard
   return (
     <div className="w-full font-mono">
       <div className="p-4 text-bb-text text-xs bg-bb-panel border-b border-bb-border">
-        <h3 className="font-bold text-bb-orange mb-2 uppercase">>> SIMULATION PROTOCOL RESULTS</h3>
+        <h3 className="font-bold text-bb-orange mb-2 uppercase">>> BACKTEST PROTOCOL RESULTS</h3>
         <p className="max-w-4xl leading-relaxed text-bb-muted">
             Executing algorithmic trading models vs. passive market benchmarks. Initial Seed: 100k INR. 
             Benchmark: Nifty 50 Buy & Hold. Goal: Outperform market alpha with risk-managed entries.

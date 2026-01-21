@@ -9,40 +9,51 @@ import { AllFOTickers } from '../constants';
 
 interface DerivativesDashboardProps {
     stocks: ProcessedStock[];
+    onExecute: (strategy: DerivativeStrategy) => void;
 }
 
-const DerivativesDashboard: React.FC<DerivativesDashboardProps> = ({ stocks }) => {
+const DerivativesDashboard: React.FC<DerivativesDashboardProps> = ({ stocks, onExecute }) => {
     const [selectedTicker, setSelectedTicker] = useState('^NSEI');
     const [chain, setChain] = useState<OptionChain | null>(null);
     const [strategy, setStrategy] = useState<DerivativeStrategy | null>(null);
     const [loading, setLoading] = useState(false);
+    const [executed, setExecuted] = useState(false);
+    const [isLive, setIsLive] = useState(false);
 
-    // Filter the AllFOTickers to show what's available vs what's in the universe
     const availableTickers = useMemo(() => new Set(stocks.map(s => s.ticker)), [stocks]);
-
     const currentStock = useMemo(() => stocks.find(s => s.ticker === selectedTicker), [stocks, selectedTicker]);
 
     useEffect(() => {
         const loadDerivatives = async () => {
             if (!currentStock) return;
             setLoading(true);
+            setExecuted(false);
+            setStrategy(null);
+            setChain(null);
+            setIsLive(false);
             
-            const optionChain = fetchOptionChain(selectedTicker, currentStock.data.currentPrice);
-            setChain(optionChain);
-            
-            const lastIdx = currentStock.indicators.rsi.length - 1;
-            const avgIV = optionChain.calls.reduce((acc, c) => acc + c.iv, 0) / optionChain.calls.length;
-            
-            const strat = await getDerivativeStrategy(
-                selectedTicker,
-                currentStock.data.currentPrice,
-                avgIV,
-                currentStock.signals.trendSignal,
-                currentStock.indicators.adx[lastIdx],
-                currentStock.indicators.rsi[lastIdx]
-            );
-            setStrategy(strat);
-            setLoading(false);
+            try {
+                const optionChain = await fetchOptionChain(selectedTicker, currentStock.data.currentPrice);
+                setChain(optionChain);
+                
+                // If the expiry date looks like a real NSE date (e.g. 28-MAR-2024), it's live
+                if (optionChain.expiryDate.includes('-')) setIsLive(true);
+
+                const lastIdx = currentStock.indicators.rsi.length - 1;
+                const strat = await getDerivativeStrategy(
+                    selectedTicker,
+                    currentStock.data.currentPrice,
+                    currentStock.signals.trendSignal,
+                    currentStock.indicators.adx[lastIdx],
+                    currentStock.indicators.rsi[lastIdx],
+                    optionChain
+                );
+                setStrategy(strat);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
         };
 
         loadDerivatives();
@@ -50,174 +61,191 @@ const DerivativesDashboard: React.FC<DerivativesDashboardProps> = ({ stocks }) =
 
     const metrics = useMemo((): DerivativeMetrics | null => {
         if (!chain) return null;
-        const totalOI = chain.calls.reduce((a, b) => a + b.oi, 0) + chain.puts.reduce((a, b) => a + b.oi, 0);
         const totalCallOI = chain.calls.reduce((a, b) => a + b.oi, 0);
         const totalPutOI = chain.puts.reduce((a, b) => a + b.oi, 0);
-        const avgIV = chain.calls.reduce((a, b) => a + b.iv, 0) / chain.calls.length;
-        
+        const avgIV = chain.calls.reduce((acc, c) => acc + c.iv, 0) / (chain.calls.length || 1);
         return {
-            totalOI,
-            rolloverPct: 78.4, // Simulated static for demo
-            putCallRatio: Number((totalPutOI / totalCallOI).toFixed(2)),
+            totalOI: totalCallOI + totalPutOI,
+            rolloverPct: 78.4, 
+            putCallRatio: Number((totalPutOI / (totalCallOI || 1)).toFixed(2)),
             avgIV: Number(avgIV.toFixed(1)),
-            maxPain: chain.underlyingPrice // Simulated
+            maxPain: chain.underlyingPrice
         };
     }, [chain]);
 
-    const getTickerLabel = (ticker: string) => {
-        if (ticker === '^NSEI') return 'INDEX: NIFTY 50';
-        if (ticker === '^NSEBANK') return 'INDEX: BANK NIFTY';
-        const label = ticker.replace('.NS', '');
-        return availableTickers.has(ticker) ? label : `${label} [SYNCING...]`;
+    const handleExecuteClick = () => {
+        if (strategy) {
+            setExecuted(true);
+            onExecute(strategy);
+        }
+    };
+
+    const getDisplayName = (t: string) => {
+        if (t === '^NSEI') return 'NIFTY 50';
+        if (t === '^NSEBANK') return 'BANK NIFTY';
+        return t.replace('.NS', '');
     };
 
     return (
         <div className="p-4 font-mono h-full overflow-y-auto bg-bb-black space-y-6">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-bb-orange pb-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-bb-orange uppercase tracking-wider">>> DERIVATIVES_DESK_v4.0</h2>
-                    <p className="text-bb-muted text-[10px] mt-1 uppercase">Advanced Open Interest & Volatility Execution Engine</p>
+                    <div className="flex items-center space-x-3">
+                        <h2 className="text-2xl font-bold text-bb-orange uppercase tracking-wider">>> DERIVATIVES_PLANNING_DESK</h2>
+                        {chain && (
+                            <span className={`text-[9px] px-2 py-0.5 border font-bold uppercase ${isLive ? 'bg-bb-green/20 border-bb-green text-bb-green' : 'bg-bb-orange/20 border-bb-orange text-bb-orange'}`}>
+                                {isLive ? 'LIVE_NSE_SYNC' : 'SYNTHETIC_FALLBACK'}
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-bb-muted text-[10px] mt-1 uppercase">Select Underlying & Synthesize Institutional Spreads (Live NSE Feed)</p>
                 </div>
                 <div className="mt-4 md:mt-0 flex items-center space-x-3">
-                    <span className="text-xs text-bb-muted uppercase">Asset:</span>
+                    <span className="text-xs text-bb-muted uppercase tracking-tighter">Instrument:</span>
                     <select 
                         value={selectedTicker}
                         onChange={(e) => setSelectedTicker(e.target.value)}
-                        className="bg-bb-dark border border-bb-border text-bb-blue font-bold px-3 py-1 outline-none focus:border-bb-orange"
+                        className="bg-bb-dark border border-bb-border text-bb-blue font-bold px-4 py-1 outline-none focus:border-bb-orange cursor-pointer"
                     >
                         {AllFOTickers.map(t => (
-                            <option 
-                                key={t} 
-                                value={t} 
-                                disabled={!availableTickers.has(t)}
-                                className={availableTickers.has(t) ? 'text-bb-blue' : 'text-bb-muted'}
-                            >
-                                {getTickerLabel(t)}
-                            </option>
+                            <option key={t} value={t} disabled={!availableTickers.has(t)}>{getDisplayName(t)}</option>
                         ))}
                     </select>
                 </div>
             </header>
 
             {!currentStock ? (
-                <div className="flex flex-col items-center justify-center h-96 border border-dashed border-bb-border">
+                <div className="flex flex-col items-center justify-center h-96 border border-dashed border-bb-border bg-bb-panel/20">
                     <Loader className="w-12 h-12 text-bb-orange mb-4 opacity-50" />
-                    <p className="text-bb-muted text-xs uppercase text-center">
-                        Waiting for Terminal to process {selectedTicker.replace('.NS', '')} data...<br/>
-                        <span className="text-[10px] mt-2 block">System is currently scanning 180+ F&O assets.</span>
-                    </p>
+                    <p className="text-bb-muted text-xs uppercase tracking-widest">Scanning exchange liquidity...</p>
                 </div>
             ) : loading ? (
                 <div className="flex flex-col items-center justify-center h-96">
                     <Loader className="w-12 h-12 text-bb-orange mb-4" />
-                    <p className="text-bb-orange text-xs animate-pulse uppercase">Syncing F&O Data Stream...</p>
+                    <p className="text-bb-orange text-xs animate-pulse uppercase tracking-widest">Querying NSE Option Chain & Processing Alpha...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 animate-fade-in">
                     
-                    {/* Left: Summary Metrics */}
-                    <div className="xl:col-span-1 space-y-4">
-                        <div className="bg-bb-panel border border-bb-border p-4">
-                            <h3 className="text-xs font-bold text-bb-orange mb-3 uppercase border-b border-bb-border pb-1">>> OPTION_GREEKS_CORE</h3>
-                            <div className="space-y-3">
-                                <MetricRow label="Underlying" value={currentStock?.data.currentPrice.toFixed(2) || '0.00'} color="text-white" />
-                                <MetricRow label="Total OI" value={metrics?.totalOI.toLocaleString() || '0'} color="text-bb-blue" />
-                                <MetricRow label="Rollover %" value={`${metrics?.rolloverPct}%`} color="text-bb-green" />
-                                <MetricRow label="Put/Call Ratio" value={metrics?.putCallRatio.toString() || '0'} color={metrics && metrics.putCallRatio > 1 ? 'text-bb-red' : 'text-bb-green'} />
-                                <MetricRow label="Avg IV" value={`${metrics?.avgIV}%`} color="text-bb-orange" />
-                                <MetricRow label="Expiry" value={chain?.expiryDate || '-'} color="text-bb-muted" />
-                            </div>
-                        </div>
-
-                        {/* AI Strategy Recommendation */}
-                        {strategy && (
-                            <div className="bg-bb-dark border-2 border-bb-blue p-4 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-2 opacity-10">
-                                    <BrainCircuitIcon className="w-12 h-12 text-bb-blue" />
-                                </div>
-                                <h3 className="text-xs font-bold text-bb-blue mb-2 uppercase">>> QUANT_STRATEGY_ENGINE</h3>
-                                <div className="text-xl font-bold text-white mb-1 uppercase tracking-tighter">{strategy.name}</div>
-                                <div className="text-[10px] text-bb-muted mb-4">{strategy.description}</div>
-                                
-                                <div className="mb-4">
-                                    <div className="flex justify-between text-[10px] mb-1">
-                                        <span className="text-bb-muted uppercase">Backtested Confidence</span>
-                                        <span className="text-bb-blue font-bold">{strategy.confidence}%</span>
-                                    </div>
-                                    <div className="w-full bg-bb-black h-1.5 border border-bb-border rounded-full">
-                                        <div 
-                                            className="h-full bg-bb-blue transition-all duration-1000" 
-                                            style={{ width: `${strategy.confidence}%` }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <div className="text-[9px] text-bb-orange font-bold uppercase mb-1">Legs:</div>
-                                    {strategy.legs.map((leg, i) => (
-                                        <div key={i} className="text-[10px] text-bb-text border-l border-bb-blue pl-2 py-0.5">{leg}</div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                    <div className="xl:col-span-12 grid grid-cols-1 md:grid-cols-4 gap-4 bg-bb-dark border border-bb-border p-4">
+                        <MarketItem label="BIAS" value={strategy?.bias || 'ANALYZING...'} color={strategy?.bias?.toLowerCase().includes('bull') ? 'text-bb-green' : strategy?.bias?.toLowerCase().includes('bear') ? 'text-bb-red' : 'text-bb-orange'} />
+                        <MarketItem label="VOLATILITY" value={strategy?.volatilityRegime || 'CALCULATING...'} color="text-bb-blue" />
+                        <MarketItem label="UNDERLYING" value={currentStock.data.currentPrice.toFixed(2)} color="text-white" />
+                        <MarketItem label="IV LEVEL" value={`${metrics?.avgIV || 0}%`} color="text-bb-orange" />
                     </div>
 
-                    {/* Right: Option Chain */}
-                    <div className="xl:col-span-3 bg-bb-dark border border-bb-border">
-                        <div className="bg-bb-panel px-4 py-2 border-b border-bb-border flex justify-between items-center">
-                            <h3 className="text-xs font-bold text-bb-orange uppercase tracking-widest">Live Option Chain</h3>
-                            <div className="text-[10px] text-bb-muted uppercase">Last Sync: {new Date().toLocaleTimeString()}</div>
+                    <div className="xl:col-span-8 space-y-6">
+                        <div className="bg-bb-panel border border-bb-border p-6 relative overflow-hidden">
+                            <div className="flex justify-between items-start border-b border-bb-border pb-4 mb-4">
+                                <div>
+                                    <h3 className="text-xs font-bold text-bb-blue uppercase mb-1">🧠 Strategy Recommendation</h3>
+                                    <h2 className="text-2xl font-bold text-white uppercase tracking-tight">{strategy?.name}</h2>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[10px] text-bb-muted uppercase mb-1">Confidence Score</div>
+                                    <div className="text-3xl font-bold text-bb-orange">{strategy?.confidence.score}%</div>
+                                </div>
+                            </div>
+                            
+                            <p className="text-sm text-bb-text leading-relaxed uppercase mb-6">{strategy?.rationale}</p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-bb-border pt-6">
+                                <div className="space-y-3">
+                                    <h4 className="text-[10px] font-bold text-bb-orange uppercase tracking-widest">📉 Risk Metrics</h4>
+                                    <MetricRow label="Max Profit" value={strategy?.maxProfit || '-'} color="text-bb-green" />
+                                    <MetricRow label="Max Loss" value={strategy?.maxLoss || '-'} color="text-bb-red" />
+                                    <MetricRow label="RR Ratio" value={strategy?.rrRatio || '-'} color="text-white" />
+                                </div>
+                                <div className="space-y-3">
+                                    <h4 className="text-[10px] font-bold text-bb-blue uppercase tracking-widest">Δ Greeks Exposure</h4>
+                                    <MetricRow label="Delta Bias" value={strategy?.greeks.delta || '-'} color="text-bb-text" />
+                                    <MetricRow label="Theta Decay" value={strategy?.greeks.theta || '-'} color="text-bb-text" />
+                                    <MetricRow label="Vega Risk" value={strategy?.greeks.vega || '-'} color="text-bb-text" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-[11px] text-center border-collapse">
+
+                        <div className="bg-bb-dark border border-bb-border overflow-hidden">
+                            <div className="bg-bb-panel px-4 py-2 border-b border-bb-border flex justify-between items-center">
+                                <h3 className="text-xs font-bold text-bb-orange uppercase tracking-wider">🧾 Proposed Trade Structure ({isLive ? 'LIVE' : 'ESTIMATED'} CHAIN)</h3>
+                                <span className="text-[9px] text-bb-muted uppercase">Expiry: {chain?.expiryDate}</span>
+                            </div>
+                            <table className="w-full text-left font-mono text-[11px]">
                                 <thead className="bg-bb-black text-bb-muted uppercase border-b border-bb-border">
                                     <tr>
-                                        <th colSpan={3} className="py-2 border-r border-bb-border bg-bb-blue/5 text-bb-blue">CALLS</th>
-                                        <th className="bg-bb-panel">STRIKE</th>
-                                        <th colSpan={3} className="py-2 border-l border-bb-border bg-bb-red/5 text-bb-red">PUTS</th>
-                                    </tr>
-                                    <tr className="border-b border-bb-border text-[9px]">
-                                        <th className="p-1">OI</th>
-                                        <th className="p-1">IV</th>
-                                        <th className="p-1 border-r border-bb-border">LTP</th>
-                                        <th className="bg-bb-panel">PRICE</th>
-                                        <th className="p-1 border-l border-bb-border">LTP</th>
-                                        <th className="p-1">IV</th>
-                                        <th className="p-1">OI</th>
+                                        <th className="px-4 py-2 font-normal">Leg</th>
+                                        <th className="px-4 py-2 font-normal">Action</th>
+                                        <th className="px-4 py-2 font-normal">Strike</th>
+                                        <th className="px-4 py-2 font-normal">Type</th>
+                                        <th className="px-4 py-2 font-normal text-right">Premium</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {chain?.calls.map((c, i) => {
-                                        const p = chain.puts[i];
-                                        const isATM = Math.abs(c.strike - chain.underlyingPrice) < 10;
-                                        return (
-                                            <tr key={c.strike} className={`hover:bg-bb-panel transition-colors ${isATM ? 'bg-bb-orange/10' : ''}`}>
-                                                <td className="p-2 text-bb-muted">{c.oi.toLocaleString()}</td>
-                                                <td className="p-2 text-bb-blue">{c.iv}%</td>
-                                                <td className="p-2 text-white font-bold border-r border-bb-border">₹{c.price}</td>
-                                                <td className="p-2 bg-bb-panel text-bb-orange font-bold font-mono">
-                                                    {c.strike}
-                                                </td>
-                                                <td className="p-2 text-white font-bold border-l border-bb-border">₹{p.price}</td>
-                                                <td className="p-2 text-bb-red">{p.iv}%</td>
-                                                <td className="p-2 text-bb-muted">{p.oi.toLocaleString()}</td>
-                                            </tr>
-                                        );
-                                    })}
+                                <tbody className="divide-y divide-bb-border/30">
+                                    {strategy?.tradeStructure.map((leg, i) => (
+                                        <tr key={i} className="hover:bg-bb-panel/50">
+                                            <td className="px-4 py-3 text-bb-muted">{leg.leg}</td>
+                                            <td className={`px-4 py-3 font-bold ${leg.action === 'BUY' ? 'text-bb-blue' : 'text-bb-orange'}`}>{leg.action}</td>
+                                            <td className="px-4 py-3 text-white">{leg.strike}</td>
+                                            <td className="px-4 py-3">{leg.type}</td>
+                                            <td className="px-4 py-3 text-right">₹{leg.premium.toFixed(2)}</td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
+                    <div className="xl:col-span-4 space-y-6">
+                        <div className="bg-bb-panel border-l-4 border-bb-orange p-6 space-y-4">
+                            <h3 className="text-xs font-bold text-bb-orange uppercase flex items-center">
+                                <BrainCircuitIcon className="w-4 h-4 mr-2" /> Confidence Factors
+                            </h3>
+                            <ul className="space-y-3">
+                                {strategy?.confidence.strengths.map((s, i) => (
+                                    <li key={i} className="text-[10px] text-bb-text uppercase flex items-start">
+                                        <span className="text-bb-green mr-2">✓</span> {s}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div className="bg-bb-dark border border-bb-red/30 p-6 space-y-3">
+                            <h3 className="text-xs font-bold text-bb-red uppercase flex items-center">
+                                ⚠️ Trading Guardrails
+                            </h3>
+                            <p className="text-[10px] text-bb-muted leading-relaxed uppercase">
+                                {strategy?.warnings}
+                            </p>
+                        </div>
+
+                        <div className="bg-bb-panel border border-bb-border p-4 space-y-4">
+                             <h3 className="text-xs font-bold text-bb-blue uppercase border-b border-bb-border pb-2">Spread Execution</h3>
+                             <button 
+                                onClick={handleExecuteClick}
+                                disabled={executed}
+                                className={`w-full py-3 font-bold uppercase transition-all ${executed ? 'bg-bb-green text-bb-black cursor-default' : 'bg-bb-blue text-bb-black hover:bg-white active:scale-95'}`}
+                             >
+                                {executed ? '>> ORDER EXECUTED' : 'EXECUTE SPREAD'}
+                             </button>
+                             <p className="text-[8px] text-bb-muted text-center uppercase">Orders will be routed to 'Payoff Visualizer' for live monitoring.</p>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
     );
 };
 
+const MarketItem: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => (
+    <div className="flex flex-col">
+        <span className="text-[9px] text-bb-muted uppercase tracking-tighter">{label}</span>
+        <span className={`text-lg font-bold ${color} tracking-tight`}>{value}</span>
+    </div>
+);
+
 const MetricRow: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => (
-    <div className="flex justify-between items-center border-b border-bb-border/30 pb-2">
-        <span className="text-[10px] text-bb-muted uppercase tracking-tighter">{label}</span>
+    <div className="flex justify-between items-center border-b border-bb-border/30 pb-1">
+        <span className="text-[9px] text-bb-muted uppercase tracking-tighter">{label}</span>
         <span className={`text-xs font-bold ${color}`}>{value}</span>
     </div>
 );

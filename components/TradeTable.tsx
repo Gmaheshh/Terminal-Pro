@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Trade } from '../types';
 import { ArrowDownIcon, ArrowUpIcon } from './Icons';
@@ -74,7 +75,8 @@ const TradeTable: React.FC<TradeTableProps> = ({ trades, title }) => {
                         <tr>
                             {headers.map(header => (
                                 <th key={header.key} className={`p-2 font-bold text-bb-muted border-b border-bb-border ${header.isNumeric ? 'text-right' : 'text-left'}`}>
-                                    <button onClick={() => requestSort(header.key)} className={`flex items-center hover:text-white transition-colors focus:outline-none w-full ${header.isNumeric ? 'justify-end' : 'justify-start'}`}>
+                                    {/* Fix: cast key as any to avoid string | number | symbol assignment error */}
+                                    <button onClick={() => requestSort(header.key as any)} className={`flex items-center hover:text-white transition-colors focus:outline-none w-full ${header.isNumeric ? 'justify-end' : 'justify-start'}`}>
                                         {header.label}
                                         {getSortIcon(header.key)}
                                     </button>

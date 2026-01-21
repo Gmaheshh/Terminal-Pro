@@ -18,6 +18,43 @@ const createOhlcvCacheKey = (data: OHLCV[]): string => {
     return `len:${data.length}-start:${first.date}/${first.close}-end:${last.date}/${last.close}`;
 };
 
+/**
+ * Helper to find the last Thursday of a given month
+ */
+const getLastThursday = (year: number, month: number): Date => {
+    const lastDay = new Date(year, month + 1, 0); // Last day of month
+    let day = lastDay.getDay(); // 0 = Sunday, 1 = Monday, ..., 4 = Thursday
+    let diff = (day >= 4) ? (day - 4) : (day + 3);
+    return new Date(year, month + 1, 0 - diff);
+};
+
+/**
+ * Calculates the next F&O expiry date (Last Thursday of the month)
+ */
+const getNextExpiryInfo = (currentDate: Date) => {
+    let year = currentDate.getFullYear();
+    let month = currentDate.getMonth();
+    
+    let expiry = getLastThursday(year, month);
+    
+    // If current date is past this month's expiry, move to next month
+    if (currentDate.getTime() > expiry.getTime()) {
+        month += 1;
+        if (month > 11) {
+            month = 0;
+            year += 1;
+        }
+        expiry = getLastThursday(year, month);
+    }
+    
+    const diffTime = expiry.getTime() - currentDate.getTime();
+    const daysToExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return {
+        expiryDate: expiry.toISOString().split('T')[0],
+        daysToExpiry: daysToExpiry >= 0 ? daysToExpiry : 0
+    };
+};
 
 export const calculateEMA = (data: number[], period: number): number[] => {
     const k = 2 / (period + 1);
@@ -236,6 +273,7 @@ export const calculateIndicators = (data: OHLCV[]): TechnicalIndicators => {
 
     const volumes = data.map(d => d.volume);
     const closes = data.map(d => d.close);
+    const ois = data.map(d => d.openInterest || 0);
     
     const atr = calculateATR(data, 14);
     const atr7 = calculateATR(data, 7); 
@@ -279,10 +317,25 @@ export const calculateIndicators = (data: OHLCV[]): TechnicalIndicators => {
 
     const volatilityPct = atr.map((val, i) => (closes[i] ? (val / closes[i]) * 100 : 0));
 
+    /** Added calculations for missing properties */
+    const high52Week = Math.max(...data.map(d => d.high).slice(-252));
+
+    const oiChangePct: number[] = Array(Math.min(data.length, 5)).fill(0);
+    for (let i = 5; i < ois.length; i++) {
+        const prevOi = ois[i-1] || 1;
+        oiChangePct.push(((ois[i] - prevOi) / prevOi) * 100);
+    }
+    
+    const oiSmartMoneyScore = oiChangePct.map((val, i) => {
+        const rv = rvol[i] || 0;
+        return (val > 2 && rv > 2) ? 100 : (val > 1 && rv > 1) ? 70 : 30;
+    });
+
     const indicators: TechnicalIndicators = {
         atr, atr7, adx, plusDI, minusDI, avgVolume, rvol, volatilityPct,
         volEma5, volEma20, ema9, ema10, ema13, ema200, macdLine, macdSignal,
-        rsi, stochRsi, sma20, sma50, sma200, obv, avdm, xt, ema9Xt, ema21Xt
+        rsi, stochRsi, sma20, sma50, sma200, obv, avdm, xt, ema9Xt, ema21Xt,
+        high52Week, oiChangePct, oiSmartMoneyScore
     };
 
     indicatorsCache.set(cacheKey, indicators);
@@ -393,6 +446,14 @@ export const generateSignals = (indicators: TechnicalIndicators, historical: OHL
 
     const factors = calculateFactorAttribution(indicators, historical);
 
+    /** Calculate missing signal properties to satisfy return type */
+    const { expiryDate, daysToExpiry } = getNextExpiryInfo(new Date());
+    
+    const high52Week = indicators.high52Week || currentData.close;
+    const distFrom52WHigh = ((high52Week - currentData.close) / high52Week) * 100;
+    
+    const oiBuild = indicators.oiChangePct[lastIndex] || 0;
+
     return {
         volumeSignal,
         trendSignal,
@@ -403,6 +464,11 @@ export const generateSignals = (indicators: TechnicalIndicators, historical: OHL
         volumeStatus: volumeStatus as any,
         priceAboveEma10,
         suggestedShares,
+
+        oiBuild,
+        expiryDate,
+        daysToExpiry,
+        distFrom52WHigh,
 
         vwlmBuySignal: vwlmBuy,
         vwlmBuySignalDate: vwlmBuyDate,

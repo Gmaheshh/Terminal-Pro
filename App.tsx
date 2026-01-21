@@ -6,24 +6,24 @@ import { getSentiment, getTechnicalInsight } from './services/geminiService';
 import { runPortfolioSimulation } from './services/backtestingService';
 import { detectMarketRegime } from './services/marketRegimeService';
 import { generateSignalAlerts } from './services/intelligenceEngine';
-import type { ProcessedStock, Sentiment, TabType, PortfolioBacktestResult, Column, StockData, TechnicalInsight, MarketRegime, SignalFactors, SignalAlert } from './types';
+import type { ProcessedStock, Sentiment, TabType, PortfolioBacktestResult, Column, StockData, TechnicalInsight, MarketRegime, SignalFactors, SignalAlert, DerivativeStrategy, TechnicalTrade } from './types';
 import { TABS, VOLUME_TREND_COLUMNS, PORTFOLIO_SIMULATION_COLUMNS, VWLM_COLUMNS } from './constants';
 import Dashboard from './components/Dashboard';
 import AnalysisModal from './components/SentimentModal';
 import { PortfolioSimulationDashboard } from './components/BacktestDashboard';
 import BacktestDetailsModal from './components/BacktestDetailsModal';
 import StockTable from './components/StockTable';
-import StockChart from './components/StockChart';
 import UserManual from './components/UserManual';
 import StrategyBacktester from './components/StrategyBacktester';
 import NewsDashboard from './components/NewsDashboard';
 import DerivativesDashboard from './components/DerivativesDashboard';
+import PayoffVisualizer from './components/PayoffVisualizer';
+import PortfolioMaker from './components/PortfolioMaker';
+import ForwardTester from './components/ForwardTester';
 import { Loader } from './components/Loader';
 import LoadingGame from './components/LoadingGame';
 import TickerTape from './components/TickerTape';
 import AlertFeed from './components/AlertFeed';
-
-// Removed redundant declare global to avoid conflict with predefined AIStudio type.
 
 const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('Volume/Trend');
   const [commandValue, setCommandValue] = useState('');
   
-  const [hasPaidKey, setHasPaidKey] = useState(false);
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   const [analysisActiveTab, setAnalysisActiveTab] = useState<'sentiment' | 'thesis'>('sentiment');
   const [modalTicker, setModalTicker] = useState<string | null>(null);
@@ -55,28 +54,8 @@ const App: React.FC = () => {
   const [isBacktestModalOpen, setIsBacktestModalOpen] = useState(false);
   const [modalBacktestData, setModalBacktestData] = useState<PortfolioBacktestResult | null>(null);
 
-  const [hoveredStock, setHoveredStock] = useState<ProcessedStock | null>(null);
-
-  // Check for paid key on mount
-  useEffect(() => {
-    const checkKey = async () => {
-      // Use any cast to check for existence of aistudio if the global interface is not yet picked up by TS
-      if ((window as any).aistudio) {
-        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-        setHasPaidKey(hasKey);
-      }
-    };
-    checkKey();
-  }, []);
-
-  const handleSelectApiKey = async () => {
-    if ((window as any).aistudio) {
-      await (window as any).aistudio.openSelectKey();
-      setHasPaidKey(true);
-      // Immediately retry some logic or simply refresh UI
-      scanStocks();
-    }
-  };
+  const [executedStrategies, setExecutedStrategies] = useState<DerivativeStrategy[]>([]);
+  const [technicalTrades, setTechnicalTrades] = useState<TechnicalTrade[]>([]);
 
   const scanStocks = useCallback(async () => {
     setLoading(true);
@@ -85,43 +64,34 @@ const App: React.FC = () => {
     setPortfolioSimResults([]);
     
     const stocksWithIndicators: Omit<ProcessedStock, 'signals'>[] = [];
-    
-    // Fetch benchmark first
-    setLoadingMessage(`> SYNCING MARKET BENCHMARK (NIFTY 50)...`);
     const niftyBenchmark = await fetchStockData('^NSEI').catch(() => null);
 
     const batchSize = 15; 
     for (let i = 0; i < Tickers.length; i += batchSize) {
         const batchTickers = Tickers.slice(i, i + batchSize);
-        setLoadingMessage(`> PROCESSING DATA BLOCK ${Math.ceil((i + 1) / batchSize)}/${Math.ceil(Tickers.length / batchSize)} [${i + 1}-${Math.min(i + batchSize, Tickers.length)}]`);
+        setLoadingMessage(`> SYNCING DATA BLOCK ${Math.ceil((i + 1) / batchSize)}/${Math.ceil(Tickers.length / batchSize)}`);
 
         const fetchDataPromises = batchTickers.map(ticker => fetchStockData(ticker).catch(() => null));
-
         const fetchedBatchResults = await Promise.all(fetchDataPromises);
 
         for (let j = 0; j < fetchedBatchResults.length; j++) {
             const nseData = fetchedBatchResults[j] as StockData | null;
-            const originalTicker = batchTickers[j];
-
             if (nseData) {
                 const indicators = calculateIndicators(nseData.historical);
-                stocksWithIndicators.push({ ticker: originalTicker, data: nseData, indicators });
+                stocksWithIndicators.push({ ticker: batchTickers[j], data: nseData, indicators: indicators });
             }
         }
-
         if (i + batchSize < Tickers.length) {
-            await new Promise(resolve => setTimeout(resolve, 150));
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
     }
     
-    setLoadingMessage(`> RUNNING ALGORITHMIC SIGNAL ENGINES...`);
-    
     const finalProcessedStocks = stocksWithIndicators.map(stock => {
       const signals = generateSignals(stock.indicators, stock.data.historical);
-      return { ...stock, signals };
+      return { ...stock, signals: signals };
     });
 
-    const simResults = runPortfolioSimulation(finalProcessedStocks, niftyBenchmark || undefined);
+    const simResults = runPortfolioSimulation(finalProcessedStocks, undefined);
     const detectedRegime = detectMarketRegime(finalProcessedStocks);
 
     setMarketRegime(detectedRegime);
@@ -147,7 +117,6 @@ const App: React.FC = () => {
     setModalTicker(ticker);
     setAnalysisActiveTab(type);
     setIsAnalysisModalOpen(true);
-    
     setSentimentData(sentiments[ticker] || null);
     setThesisData(theses[ticker] || null);
     
@@ -158,7 +127,6 @@ const App: React.FC = () => {
     if (type === 'thesis' && theses[ticker]) return;
 
     setIsAnalysisLoading(true);
-
     try {
         if (type === 'sentiment') {
             const result = await getSentiment(ticker);
@@ -172,9 +140,7 @@ const App: React.FC = () => {
             }
         }
     } catch (error: any) {
-      console.error(`Failed to fetch ${type}:`, error);
-      if (error?.message?.includes('429') || error?.message?.includes('RESOURCE_EXHAUSTED')) {
-          // If we hit 429, suggest selecting a paid key
+      if (error?.message?.includes('429')) {
           setErrorCount(prev => prev + 1);
       }
     } finally {
@@ -182,74 +148,80 @@ const App: React.FC = () => {
     }
   }, [processedStocks, sentiments, theses]);
 
-  useEffect(() => {
-    if (isAnalysisModalOpen && modalTicker) {
-        handleFetchAnalysis(modalTicker, analysisActiveTab);
-    }
-  }, [analysisActiveTab, isAnalysisModalOpen, modalTicker, handleFetchAnalysis]);
-
-
-  const closeAnalysisModal = () => {
-    setIsAnalysisModalOpen(false);
-    setModalTicker(null);
+  const handleExecuteStrategy = (strategy: DerivativeStrategy) => {
+    setExecutedStrategies(prev => [strategy, ...prev]);
+    setActiveTab('Payoff Visualizer');
   };
 
-  const handleShowBacktestDetails = useCallback((result: PortfolioBacktestResult) => {
-    setModalBacktestData(result);
-    setIsBacktestModalOpen(true);
-  }, []);
-  
-  const closeBacktestModal = () => {
-    setIsBacktestModalOpen(false);
-    setModalBacktestData(null);
+  const handleExecuteTechnicalTrade = (stock: ProcessedStock) => {
+      const isVWLM = stock.signals.vwlmBuySignal || stock.signals.vwlmSellSignal;
+      const direction = (stock.signals.vwlmSellSignal || stock.signals.trendSignal === 'Downtrend') ? 'SHORT' : 'LONG';
+      
+      const trade: TechnicalTrade = {
+          ticker: stock.ticker,
+          entryPrice: stock.data.currentPrice,
+          currentPrice: stock.data.currentPrice,
+          stopLoss: isVWLM ? (stock.signals.vwlmStopLoss || 0) : stock.signals.stopLoss,
+          target: isVWLM ? (stock.signals.vwlmTarget || 0) : stock.signals.target,
+          timestamp: new Date().toLocaleTimeString(),
+          direction: direction as 'LONG' | 'SHORT',
+          historical: stock.data.historical
+      };
+
+      if (!technicalTrades.some(t => t.ticker === trade.ticker)) {
+        setTechnicalTrades(prev => [trade, ...prev]);
+        setActiveTab('Payoff Visualizer');
+      }
+  };
+
+  const handleCloseStrategy = (index: number) => {
+    setExecutedStrategies(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCloseTechnicalTrade = (index: number) => {
+    setTechnicalTrades(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleCommandChange = (val: string) => {
       setCommandValue(val);
       const upperVal = val.toUpperCase();
-      
       if (upperVal === 'NEWS') setActiveTab('Recent News');
-      else if (upperVal === 'SIM' || upperVal === 'PORT') setActiveTab('Portfolio Simulation');
+      else if (upperVal === 'SIM' || upperVal === 'PORT' || upperVal === 'BACKTEST') setActiveTab('Backtest Simulation');
       else if (upperVal === 'STRAT' || upperVal === 'BACK') setActiveTab('Strategy Backtester');
       else if (upperVal === 'HELP' || upperVal === 'MAN') setActiveTab('User Manual');
       else if (upperVal === 'VOL') setActiveTab('Volume/Trend');
       else if (upperVal === 'VWLM') setActiveTab('VWLM');
       else if (upperVal === 'OPT' || upperVal === 'DER') setActiveTab('Derivatives Desk');
-      else if (upperVal === 'ALERTS' || upperVal === 'INTEL') setIsAlertsVisible(true);
+      else if (upperVal === 'VIS' || upperVal === 'PAYOFF') setActiveTab('Payoff Visualizer');
+      else if (upperVal === 'MAKER' || upperVal === 'OPTIMIZE') setActiveTab('Portfolio Maker');
+      else if (upperVal === 'TEST' || upperVal === 'SYNC' || upperVal === 'FORWARD') setActiveTab('Forward Test');
   };
 
   const filteredData = useMemo(() => {
     let data = processedStocks;
-    
-    switch(activeTab) {
-        case 'Volume/Trend':
-            data = processedStocks.filter(s => s.signals.volumeSignal === 'Spike' && (s.signals.trendSignal === 'Uptrend' || s.signals.trendSignal === 'Downtrend'));
-            break;
-        case 'VWLM':
-            data = processedStocks.filter(s => s.signals.vwlmBuySignal || s.signals.vwlmSellSignal);
-            break;
+    if (activeTab === 'Volume/Trend') {
+        data = processedStocks.filter(s => s.signals.volumeSignal === 'Spike');
+    } else if (activeTab === 'VWLM') {
+        data = processedStocks.filter(s => s.signals.vwlmBuySignal || s.signals.vwlmSellSignal);
     }
-
     if (commandValue.length > 0) {
         const search = commandValue.toUpperCase();
-        const keywords = ['NEWS', 'SIM', 'PORT', 'STRAT', 'BACK', 'HELP', 'MAN', 'VOL', 'VWLM', 'OPT', 'DER', 'ALERTS', 'INTEL'];
+        const keywords = ['NEWS', 'SIM', 'PORT', 'BACKTEST', 'STRAT', 'BACK', 'HELP', 'MAN', 'VOL', 'VWLM', 'OPT', 'DER', 'VIS', 'PAYOFF', 'ALERTS', 'INTEL', 'MAKER', 'OPTIMIZE', 'TEST', 'SYNC', 'FORWARD'];
         if (!keywords.includes(search)) {
              data = data.filter(s => s.ticker.includes(search));
         }
     }
-
     return data;
   }, [processedStocks, activeTab, commandValue]);
 
   const columns = useMemo(() => {
     switch(activeTab) {
-      case 'Volume/Trend': return VOLUME_TREND_COLUMNS(handleFetchAnalysis, sentiments);
-      case 'VWLM': return VWLM_COLUMNS(handleFetchAnalysis);
-      case 'Portfolio Simulation': return PORTFOLIO_SIMULATION_COLUMNS(handleShowBacktestDetails);
-      default: 
-        return [];
+      case 'Volume/Trend': return VOLUME_TREND_COLUMNS(handleFetchAnalysis, handleExecuteTechnicalTrade);
+      case 'VWLM': return VWLM_COLUMNS(handleFetchAnalysis, handleExecuteTechnicalTrade);
+      case 'Backtest Simulation': return PORTFOLIO_SIMULATION_COLUMNS((res) => { setModalBacktestData(res); setIsBacktestModalOpen(true); });
+      default: return [];
     }
-  }, [activeTab, handleFetchAnalysis, handleShowBacktestDetails, sentiments]);
+  }, [activeTab, handleFetchAnalysis, handleExecuteTechnicalTrade]);
 
   if (loading) {
     return (
@@ -263,32 +235,8 @@ const App: React.FC = () => {
     );
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'Portfolio Simulation':
-        return <PortfolioSimulationDashboard columns={columns as Column<PortfolioBacktestResult>[]} data={portfolioSimResults} />;
-      case 'Strategy Backtester':
-        return <StrategyBacktester results={portfolioSimResults} />;
-      case 'Derivatives Desk':
-        return <DerivativesDashboard stocks={processedStocks} />;
-      case 'User Manual':
-        return <UserManual />;
-      case 'Recent News':
-        return <NewsDashboard processedStocks={processedStocks} />;
-      default:
-        return (
-          <StockTable 
-            columns={columns as Column<ProcessedStock>[]} 
-            data={filteredData} 
-            activeTab={activeTab} 
-            onHover={setHoveredStock}
-          />
-        );
-    }
-  };
-
   return (
-    <div className="h-screen bg-bb-black text-bb-text flex flex-col overflow-hidden selection:bg-bb-orange selection:text-bb-black">
+    <div className="h-screen bg-bb-black text-bb-text flex flex-col overflow-hidden font-sans">
       <Dashboard
         tabs={TABS}
         activeTab={activeTab}
@@ -300,40 +248,39 @@ const App: React.FC = () => {
         regime={marketRegime}
         commandValue={commandValue}
         onCommandChange={handleCommandChange}
-        hasPaidKey={hasPaidKey}
-        onSelectApiKey={handleSelectApiKey}
       >
         <div className="h-full overflow-auto custom-scrollbar">
-            {renderContent()}
+            {activeTab === 'Backtest Simulation' && <PortfolioSimulationDashboard columns={columns as Column<PortfolioBacktestResult>[]} data={portfolioSimResults} />}
+            {activeTab === 'Strategy Backtester' && <StrategyBacktester results={portfolioSimResults} />}
+            {activeTab === 'Derivatives Desk' && <DerivativesDashboard stocks={processedStocks} onExecute={handleExecuteStrategy} />}
+            {activeTab === 'Portfolio Maker' && <PortfolioMaker stocks={processedStocks} marketRegime={marketRegime?.type} />}
+            {activeTab === 'Forward Test' && <ForwardTester processedStocks={processedStocks} />}
+            {activeTab === 'Payoff Visualizer' && (
+                <PayoffVisualizer 
+                    strategies={executedStrategies} 
+                    onCloseStrategy={handleCloseStrategy} 
+                    technicalTrades={technicalTrades}
+                    onCloseTechnical={handleCloseTechnicalTrade}
+                />
+            )}
+            {activeTab === 'User Manual' && <UserManual />}
+            {activeTab === 'Recent News' && <NewsDashboard processedStocks={processedStocks} />}
+            {!['Backtest Simulation', 'Strategy Backtester', 'Derivatives Desk', 'Portfolio Maker', 'Payoff Visualizer', 'User Manual', 'Recent News', 'Forward Test'].includes(activeTab) && (
+              <StockTable 
+                columns={columns as Column<ProcessedStock>[]} 
+                data={filteredData} 
+                activeTab={activeTab} 
+              />
+            )}
         </div>
       </Dashboard>
       
       <TickerTape stocks={processedStocks} />
-      
-      {isAlertsVisible && (
-        <AlertFeed 
-          alerts={signalAlerts} 
-          loading={isAlertsLoading} 
-          onRefresh={() => runIntelligenceScan(processedStocks)}
-          onClose={() => setIsAlertsVisible(false)}
-        />
-      )}
-
-      {hoveredStock && !['Portfolio Simulation', 'Strategy Backtester', 'User Manual', 'Recent News', 'Derivatives Desk'].includes(activeTab) && (
-        <div className="fixed bottom-12 right-4 z-50 w-[450px] h-[300px] bg-bb-black border border-bb-orange shadow-[0_0_15px_rgba(255,153,0,0.15)] animate-fade-in hidden lg:block">
-           <div className="bg-bb-orange text-bb-black px-2 py-1 text-xs font-mono font-bold flex justify-between items-center">
-              <span>CHART: {hoveredStock.ticker}</span>
-              <span>[LIVE]</span>
-           </div>
-           <div className="w-full h-[calc(100%-24px)] p-1">
-               <StockChart data={hoveredStock.data.historical} ticker={hoveredStock.ticker} />
-           </div>
-        </div>
-      )}
+      {isAlertsVisible && <AlertFeed alerts={signalAlerts} loading={isAlertsLoading} onRefresh={() => runIntelligenceScan(processedStocks)} onClose={() => setIsAlertsVisible(false)} />}
 
       <AnalysisModal
         isOpen={isAnalysisModalOpen}
-        onClose={closeAnalysisModal}
+        onClose={() => setIsAnalysisModalOpen(false)}
         ticker={modalTicker}
         sentiment={sentimentData}
         technicalThesis={thesisData}
@@ -341,11 +288,10 @@ const App: React.FC = () => {
         activeTab={analysisActiveTab}
         setActiveTab={setAnalysisActiveTab}
         isLoading={isAnalysisLoading}
-        onUpgradeRequested={handleSelectApiKey}
       />
       <BacktestDetailsModal 
         isOpen={isBacktestModalOpen}
-        onClose={closeBacktestModal}
+        onClose={() => setIsBacktestModalOpen(false)}
         result={modalBacktestData}
       />
     </div>

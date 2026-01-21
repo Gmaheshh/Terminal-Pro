@@ -11,10 +11,23 @@ export interface OHLCV {
   openInterest?: number;
 }
 
+export interface FundamentalData {
+  peRatio?: number;
+  pbRatio?: number;
+  roe?: number;
+  debtToEquity?: number;
+  dividendYield?: number;
+  marketCap?: number;
+  eps?: number;
+  sector?: string;
+  industry?: string;
+}
+
 export interface StockData {
   ticker: string;
   currentPrice: number;
   historical: OHLCV[];
+  fundamentals?: FundamentalData;
 }
 
 export interface TechnicalIndicators {
@@ -54,45 +67,6 @@ export interface TechnicalIndicators {
   oiSmartMoneyScore: number[];
 }
 
-export interface OptionContract {
-  strike: number;
-  price: number;
-  change: number;
-  iv: number;
-  oi: number;
-  volume: number;
-}
-
-export interface OptionChain {
-  ticker: string;
-  expiryDate: string;
-  underlyingPrice: number;
-  calls: OptionContract[];
-  puts: OptionContract[];
-}
-
-export interface DerivativeStrategy {
-  name: string;
-  description: string;
-  riskReward: string;
-  confidence: number;
-  rationale: string;
-  legs: string[];
-}
-
-export interface DerivativeMetrics {
-  totalOI: number;
-  rolloverPct: number;
-  putCallRatio: number;
-  avgIV: number;
-  maxPain: number;
-}
-
-export type VolumeSignal = 'Spike' | 'Normal';
-export type TrendSignal = 'Uptrend' | 'Downtrend' | 'Weak';
-export type VolumeEmaSignal = 'Bullish' | 'Bearish' | 'Neutral';
-export type VolumeStatus = 'High 🔺' | 'Low 🔻' | 'Average ➖' | 'NA';
-
 export interface SignalFactors {
     momentum: number;
     volume: number;
@@ -102,28 +76,25 @@ export interface SignalFactors {
     dominantFactor: 'MOMENTUM' | 'VOLUME' | 'TREND' | 'VOLATILITY' | 'INSTITUTIONAL' | 'BALANCED';
 }
 
-export type AlertImpact = 'CONFIRMING' | 'THREATENING' | 'NEUTRAL';
-
 export interface SignalAlert {
     ticker: string;
     signalDirection: 'LONG' | 'SHORT';
     event: string;
-    impact: AlertImpact;
+    impact: 'CONFIRMING' | 'THREATENING' | 'NEUTRAL';
     reason: string;
     timestamp: string;
 }
 
 export interface Signals {
-  volumeSignal: VolumeSignal;
-  trendSignal: TrendSignal;
-  volumeEmaSignal: VolumeEmaSignal;
+  volumeSignal: 'Spike' | 'Normal';
+  trendSignal: 'Uptrend' | 'Downtrend' | 'Weak';
+  volumeEmaSignal: 'Bullish' | 'Bearish' | 'Neutral';
   volumeSpikeSignalDate: string;
   stopLoss: number;
   target: number;
-  volumeStatus: VolumeStatus;
+  volumeStatus: 'High 🔺' | 'Low 🔻' | 'Average ➖' | 'NA';
   priceAboveEma10: boolean;
   suggestedShares?: number;
-  distFrom52WHigh?: number;
   oiBuild: number;
   expiryDate: string;
   daysToExpiry: number;
@@ -135,6 +106,7 @@ export interface Signals {
   vwlmStopLoss?: number;
   vwlmTarget?: number;
   factors: SignalFactors;
+  distFrom52WHigh: number;
 }
 
 export interface ProcessedStock {
@@ -142,7 +114,6 @@ export interface ProcessedStock {
   data: StockData;
   indicators: TechnicalIndicators;
   signals: Signals;
-  intelligence?: SignalAlert[];
 }
 
 export interface SearchSource {
@@ -163,30 +134,19 @@ export interface TechnicalInsight {
     confidenceScore: number;
 }
 
-export interface NewsItem {
-  title: string;
-  summary: string;
-  relatedTickers: string[];
-  sentiment: 'Bullish' | 'Bearish' | 'Neutral';
-  timestamp?: string;
-}
-
-export interface NewsResult {
-    items: NewsItem[];
-    sources: SearchSource[];
-}
-
 export interface Trade {
   ticker: string;
   entryDate: string;
   entryPrice: number;
   exitDate: string;
   exitPrice: number;
-  pnl: number; 
+  pnl: number;
   tradeRoI: number;
   shares: number;
   entryCapital: number;
   exitCapital: number;
+  charges?: number;
+  netPnl?: number;
 }
 
 export interface EquityPoint {
@@ -207,14 +167,21 @@ export interface PortfolioBacktestResult {
   finalCapital: number;
   equityCurve: EquityPoint[];
   isBenchmark?: boolean;
+  totalCharges: number;
+  netReturn: number;
+  netFinalCapital: number;
 }
 
-export type TabType = 'Volume/Trend' | 'VWLM' | 'Derivatives Desk' | 'Portfolio Simulation' | 'Strategy Backtester' | 'Recent News' | 'User Manual';
+export interface NewsItem {
+  title: string;
+  summary: string;
+  relatedTickers: string[];
+  sentiment: 'Bullish' | 'Bearish' | 'Neutral';
+}
 
-export interface Column<T> {
-  header: string;
-  accessor: keyof T | ((item: T) => ReactNode);
-  sortable?: boolean;
+export interface NewsResult {
+    items: NewsItem[];
+    sources: SearchSource[];
 }
 
 export type RegimeType = 'TRENDING' | 'RISK_OFF' | 'HIGH_VOLATILITY' | 'RANGE_BOUND' | 'NEUTRAL';
@@ -242,14 +209,12 @@ export interface EmaSignalResult {
 }
 
 export interface ArbitrageOpportunity {
-    ticker: string;
-    baseName: string;
-    nsePrice: number;
-    bsePrice: number;
-    spread: number;
-    spreadPct: number;
-    signal: 'BUY_NSE_SELL_BSE' | 'BUY_BSE_SELL_NSE' | 'NEUTRAL';
-    timestamp: string;
+  ticker: string;
+  nsePrice: number;
+  bsePrice: number;
+  spread: number;
+  spreadPct: number;
+  signal: 'BUY NSE' | 'BUY BSE' | 'NEUTRAL';
 }
 
 export interface CoachInsight {
@@ -291,4 +256,142 @@ export interface RiskAnalysis {
     maxSinglePositionTicker: string;
     status: 'SAFE' | 'CAUTION' | 'CRITICAL';
     recommendation: string;
+}
+
+export type TabType = 'Volume/Trend' | 'VWLM' | 'Derivatives Desk' | 'Payoff Visualizer' | 'Portfolio Maker' | 'Backtest Simulation' | 'Strategy Backtester' | 'Forward Test' | 'Recent News' | 'User Manual';
+
+export interface Column<T> {
+  header: string;
+  accessor: keyof T | ((item: T) => ReactNode);
+  sortable?: boolean;
+}
+
+// Option & Derivative Types
+export interface OptionContract {
+  strike: number;
+  price: number;
+  change: number;
+  iv: number;
+  oi: number;
+  volume: number;
+}
+
+export interface OptionChain {
+  ticker: string;
+  expiryDate: string;
+  underlyingPrice: number;
+  calls: OptionContract[];
+  puts: OptionContract[];
+}
+
+export interface PayoffPoint {
+  price: number;
+  pnl: number;
+}
+
+export interface StrategyLeg {
+  leg: string;
+  action: 'BUY' | 'SELL';
+  strike: number;
+  type: 'CE' | 'PE';
+  premium: number;
+}
+
+export interface DerivativeStrategy {
+  ticker: string;
+  name: string;
+  bias: 'Bullish' | 'Bearish' | 'Range-bound' | 'Volatile';
+  volatilityRegime: 'Low IV' | 'Neutral IV' | 'High IV';
+  rationale: string;
+  tradeStructure: StrategyLeg[];
+  maxProfit: string;
+  maxLoss: string;
+  breakevens: string[];
+  rrRatio: string;
+  greeks: {
+    delta: string;
+    theta: string;
+    vega: string;
+  };
+  confidence: {
+    score: number;
+    strengths: string[];
+    keyRisk: string;
+  };
+  backtest: {
+    winRate: string;
+    avgReturn: string;
+    notes: string;
+  };
+  warnings: string;
+  payoffPoints: PayoffPoint[];
+  holdingPeriod: string;
+  executionPrice: number;
+  timestamp: string;
+}
+
+export interface TechnicalTrade {
+    ticker: string;
+    entryPrice: number;
+    currentPrice: number;
+    stopLoss: number;
+    target: number;
+    timestamp: string;
+    direction: 'LONG' | 'SHORT';
+    historical: OHLCV[];
+}
+
+export interface DerivativeMetrics {
+  totalOI: number;
+  rolloverPct: number;
+  putCallRatio: number;
+  avgIV: number;
+  maxPain: number;
+}
+
+// Portfolio Optimization Types
+export interface OptimizationRecommendation {
+    ticker: string;
+    action: 'ADD' | 'REMOVE' | 'WEIGHT_UP' | 'WEIGHT_DOWN' | 'RETAIN';
+    reason: string;
+    expectedImpactOnSharpe: number;
+    historicalSharpe: number;
+}
+
+export interface FundamentalFilters {
+  maxPE?: number;
+  maxPB?: number;
+  minROE?: number;
+  maxDebtEquity?: number;
+  minDivYield?: number;
+}
+
+export interface PortfolioMetrics {
+    annualReturn: number;
+    annualVolatility: number;
+    sharpeRatio: number;
+    beta?: number;
+    optimalWeights: Record<string, number>; // Maps Ticker -> % Weight
+    recommendations: OptimizationRecommendation[];
+    aiInsight?: string;
+}
+
+// OpenAlgo Types
+export interface OpenAlgoOrder {
+    id: string;
+    timestamp: string;
+    ticker: string;
+    action: 'BUY' | 'SELL';
+    quantity: number;
+    strategy: string;
+    price: number;
+    status: 'PENDING' | 'SENT' | 'FAILED' | 'REJECTED';
+    response?: string;
+}
+
+export interface OpenAlgoConfig {
+    apiUrl: string;
+    apikey: string;
+    isSandbox: boolean;
+    isActive: boolean;
 }

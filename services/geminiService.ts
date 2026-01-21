@@ -1,10 +1,20 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import type { Sentiment, SearchSource, TechnicalInsight, TechnicalIndicators, Signals, PortfolioBacktestResult, CoachInsight, LogisticsAnalysis, MapLocation, DerivativeStrategy } from '../types';
+import type { 
+    Sentiment, 
+    TechnicalInsight, 
+    TechnicalIndicators, 
+    DerivativeStrategy, 
+    OptionChain, 
+    PortfolioBacktestResult, 
+    CoachInsight, 
+    LogisticsAnalysis,
+    FundamentalFilters
+} from '../types';
 
 const sentimentCache = new Map<string, Sentiment>();
 const thesisCache = new Map<string, TechnicalInsight>();
-const coachCache = new Map<string, CoachInsight>();
+const strategyCache = new Map<string, DerivativeStrategy>();
 
 const getAiClient = () => {
     const apiKey = process.env.API_KEY;
@@ -14,305 +24,222 @@ const getAiClient = () => {
     return new GoogleGenAI({ apiKey });
 }
 
-export async function getDerivativeStrategy(
-    ticker: string, 
-    price: number, 
-    iv: number, 
-    trend: string, 
-    adx: number,
-    rsi: number
-): Promise<DerivativeStrategy> {
+export async function suggestFundamentalFilters(marketRegime: string): Promise<FundamentalFilters> {
     const ai = getAiClient();
+    const prompt = `Based on the current Indian stock market regime: ${marketRegime}, suggest ideal fundamental screening thresholds for a high-quality value/growth portfolio. 
+    Provide values for PE Ratio, Price-to-Book, minimum ROE (%), maximum Debt-to-Equity, and minimum Dividend Yield (%).
     
-    const prompt = `You are a high-level derivatives strategist. 
-    Analyze the following setup for ${ticker}:
-    - Current Price: ${price}
-    - Avg IV: ${iv}%
-    - Technical Trend: ${trend}
-    - ADX: ${adx}
-    - RSI: ${rsi}
-    
-    Recommend the optimal derivative strategy (e.g., Bull Call Spread, Iron Condor, Long Straddle, etc.).
-    Consider Volatility levels for choosing between Debit and Credit spreads.
-    Provide a confidence score based on your internal knowledge of how this strategy performs in similar technical regimes.
-    
-    Return ONLY JSON with: "name", "description", "riskReward", "confidence" (number 0-100), "rationale", "legs" (array of strings).`;
+    RETURN STRICT JSON:
+    {
+      "maxPE": number,
+      "maxPB": number,
+      "minROE": number,
+      "maxDebtEquity": number,
+      "minDivYield": number
+    }`;
 
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        name: { type: Type.STRING },
-                        description: { type: Type.STRING },
-                        riskReward: { type: Type.STRING },
-                        confidence: { type: Type.NUMBER },
-                        rationale: { type: Type.STRING },
-                        legs: { type: Type.ARRAY, items: { type: Type.STRING } }
-                    },
-                    required: ['name', 'description', 'confidence', 'rationale', 'legs']
-                }
+            config: { responseMimeType: "application/json" }
+        });
+        return JSON.parse(response.text || '{}');
+    } catch (e) {
+        console.error("AI filter suggestion failed", e);
+        return { maxPE: 25, maxPB: 4, minROE: 15, maxDebtEquity: 100, minDivYield: 1 };
+    }
+}
+
+export async function getDerivativeStrategy(
+    ticker: string, 
+    price: number, 
+    trend: string, 
+    adx: number,
+    rsi: number,
+    optionChain: OptionChain
+): Promise<DerivativeStrategy> {
+    const cacheKey = `${ticker}-${price.toFixed(0)}-${trend}`;
+    if (strategyCache.has(cacheKey)) {
+        return strategyCache.get(cacheKey)!;
+    }
+
+    const ai = getAiClient();
+    const atmCalls = optionChain.calls.slice(5, 15);
+    const atmPuts = optionChain.puts.slice(5, 15);
+    const avgIV = atmCalls.reduce((acc, c) => acc + c.iv, 0) / atmCalls.length;
+    
+    // Mapping internal tickers to human names to avoid LLM confusion
+    const friendlyName = ticker === '^NSEI' ? 'NIFTY 50' : ticker === '^NSEBANK' ? 'BANK NIFTY' : ticker;
+    const validStrikes = optionChain.calls.map(c => c.strike).sort((a,b) => a-b);
+
+    const prompt = `You are an institutional derivatives desk manager. 
+    IMPORTANT: You are analyzing ${friendlyName} (${ticker}). Current Spot is ${price.toFixed(2)}.
+    DO NOT generate a strategy for Bank Nifty if the ticker is Nifty 50, and vice versa.
+    
+    CONTEXT:
+    Underlying: ${friendlyName}
+    Spot Price: ${price.toFixed(2)}
+    Trend: ${trend}
+    ADX: ${adx.toFixed(2)}
+    RSI: ${rsi.toFixed(2)}
+    Avg IV: ${avgIV.toFixed(1)}%
+    Expiry: ${optionChain.expiryDate}
+
+    MANDATORY STRIKE SELECTION: 
+    You MUST pick strikes ONLY from this list: [${validStrikes.join(', ')}].
+    Pick 2 legs for a spread (Bull Call, Bear Put, Credit Spread, etc.).
+
+    RETURN STRICT JSON:
+    {
+      "name": "Strategy Name (e.g. ${friendlyName} Bull Call Spread)", 
+      "bias": "Market Bias", 
+      "volatilityRegime": "IV Status", 
+      "rationale": "Short explanation based on technicals provided", 
+      "holdingPeriod": "Duration",
+      "tradeStructure": [
+        {"leg": "1", "action": "BUY/SELL", "strike": number, "type": "CE/PE", "premium": number},
+        {"leg": "2", "action": "BUY/SELL", "strike": number, "type": "CE/PE", "premium": number}
+      ],
+      "maxProfit": "Value (e.g. ₹4500)", 
+      "maxLoss": "Value (e.g. ₹2100)", 
+      "breakevens": ["Strike Price"], 
+      "rrRatio": "1:X", 
+      "greeks": {"delta": "value", "theta": "value", "vega": "value"},
+      "confidence": {"score": number, "strengths": ["Reason1", "Reason2"], "keyRisk": "Main Risk"}, 
+      "backtest": {"winRate": "XX%", "avgReturn": "XX%", "notes": "Insight"},
+      "warnings": "Strict caution based on IV/Trend", 
+      "payoffPoints": [{"price": number, "pnl": number}]
+    }
+
+    Notes: 
+    - Premia should be realistic relative to the Spot and distance from strike.
+    - Payoff points must cover a range of prices around the current spot.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+            config: { 
+              responseMimeType: "application/json",
+              systemInstruction: `You are a strict financial quant. Never mix Nifty 50 and Bank Nifty strikes. Use the exact Spot and valid strikes provided in the context.`
             }
         });
-
-        return JSON.parse(response.text || '{}');
+        
+        const strategy = JSON.parse(response.text || '{}');
+        strategy.ticker = ticker;
+        strategy.executionPrice = price;
+        strategy.timestamp = new Date().toLocaleTimeString();
+        
+        strategyCache.set(cacheKey, strategy);
+        return strategy;
     } catch (error) {
         console.error("Strategy generation error:", error);
-        return {
-            name: "Neutral Iron Condor",
-            description: "Range-bound play on high volatility crush.",
-            riskReward: "Limited Risk / Limited Reward",
-            confidence: 50,
-            rationale: "Defaulting to neutral due to system error.",
-            legs: ["Sell 1x ATM Call", "Sell 1x ATM Put", "Buy 1x OTM Call", "Buy 1x OTM Put"]
-        };
+        throw error;
     }
 }
 
 export async function getSentiment(ticker: string): Promise<Sentiment> {
-  if (sentimentCache.has(ticker)) {
-    return sentimentCache.get(ticker)!;
-  }
-
+  if (sentimentCache.has(ticker)) return sentimentCache.get(ticker)!;
   const ai = getAiClient();
-
-  const prompt = `Analyze the recent market sentiment and official corporate disclosures for the stock ticker "${ticker}". 
-  Use Google Search to specifically find:
-  1. The latest Quarterly Earnings Results (NSE/BSE Filings or PDF reports).
-  2. Investor Presentations and Management Commentary/Concalls.
-  3. Institutional analyst ratings and target price changes.
-  
-  Provide a concise, 2-sentence executive summary that prioritizes official data over social noise.
-  Classify the sentiment as 'Bullish', 'Bearish', or 'Neutral'.
-  Respond with ONLY a JSON object with two keys: "sentiment" (string) and "summary" (string).`;
-
+  const prompt = `Analyze sentiment for ${ticker} using Google Search. Return JSON: {"sentiment": "Bullish/Bearish/Neutral", "summary": "2 sentences"}`;
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
+      config: { tools: [{ googleSearch: {} }] },
     });
-
-    let jsonString = response.text || '{}';
-    
-    const match = jsonString.match(/```json\s*([\s\S]*?)\s*```/) || jsonString.match(/```\s*([\s\S]*?)\s*```/);
-    if (match) {
-        jsonString = match[1];
-    }
-
-    const startIndex = jsonString.indexOf('{');
-    const endIndex = jsonString.lastIndexOf('}');
-    if (startIndex !== -1 && endIndex !== -1) {
-        jsonString = jsonString.substring(startIndex, endIndex + 1);
-    }
-
-    let parsedJson;
-    try {
-        parsedJson = JSON.parse(jsonString);
-    } catch (e) {
-        parsedJson = { sentiment: 'Neutral', summary: 'Analysis available via news feed.' };
-    }
-
-    const validSentiments = ['Bullish', 'Bearish', 'Neutral'];
-    const sentimentVal = validSentiments.includes(parsedJson.sentiment) ? parsedJson.sentiment : 'Neutral';
-
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    const sources: SearchSource[] = groundingChunks
-        ?.map((chunk: any) => (chunk.web ? {
-            uri: chunk.web.uri,
-            title: chunk.web.title,
-        } : null))
-        .filter((source: any): source is SearchSource => source !== null && !!source.uri && !!source.title) ?? [];
-
-    const result: Sentiment = {
-        sentiment: sentimentVal,
-        summary: parsedJson.summary || "Analysis available.",
-        sources: sources,
-    };
-    
+    const result = JSON.parse(response.text || '{"sentiment": "Neutral", "summary": "Data unavailable."}');
     sentimentCache.set(ticker, result);
     return result;
-  } catch (error) {
-    console.error(`Error fetching sentiment for ${ticker}:`, error);
-    return {
-      sentiment: 'Error',
-      summary: 'Failed to retrieve sentiment data.'
-    };
+  } catch {
+    return { sentiment: 'Neutral', summary: 'Analysis error.' };
   }
 }
 
-export async function getTechnicalInsight(ticker: string, indicators: TechnicalIndicators, signals: Signals): Promise<TechnicalInsight> {
-    if (thesisCache.has(ticker)) {
-        return thesisCache.get(ticker)!;
-    }
-
+export async function getTechnicalInsight(ticker: string, indicators: TechnicalIndicators, signals: any): Promise<TechnicalInsight> {
+    if (thesisCache.has(ticker)) return thesisCache.get(ticker)!;
     const ai = getAiClient();
-
-    const lastIdx = indicators.rsi.length - 1;
-    const context = {
-        rsi: indicators.rsi[lastIdx]?.toFixed(2),
-        adx: indicators.adx[lastIdx]?.toFixed(2),
-        macdDiff: (indicators.macdLine[lastIdx] - indicators.macdSignal[lastIdx])?.toFixed(4),
-        rvol: indicators.rvol[lastIdx]?.toFixed(2),
-        sma200Relation: indicators.sma200[lastIdx] ? (indicators.sma20[lastIdx] > indicators.sma200[lastIdx] ? 'Above' : 'Below') : 'N/A',
-        signals: {
-            volume: signals.volumeSignal,
-            trend: signals.trendSignal,
-            vwlm: signals.vwlmBuySignal ? 'BUY' : signals.vwlmSellSignal ? 'SELL' : 'NEUTRAL'
-        }
-    };
-
-    const prompt = `You are a senior quantitative trader. Analyze the following technical indicators for ${ticker}.
-    Context: ${JSON.stringify(context)}
-    Task: 
-    1. Synthesize a "Trading Thesis" explaining the technical setup (2 sentences max).
-    2. Determine the outlook (Bullish/Bearish/Neutral).
-    3. List 3 key factors.
-    4. Assign a confidence score (0-100).
-    Return JSON.`;
-
+    const prompt = `Analyze technicals for ${ticker}. RSI: ${indicators.rsi.slice(-1)}, ADX: ${indicators.adx.slice(-1)}. Return JSON with thesis, outlook, keyFactors, confidenceScore.`;
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        thesis: { type: Type.STRING },
-                        outlook: { type: Type.STRING },
-                        keyFactors: { 
-                            type: Type.ARRAY, 
-                            items: { type: Type.STRING } 
-                        },
-                        confidenceScore: { type: Type.NUMBER }
-                    }
-                }
-            }
+            config: { responseMimeType: "application/json" }
         });
-
-        const data = JSON.parse(response.text || '{}');
-        
-        const result: TechnicalInsight = {
-            thesis: data.thesis || "Data insufficient for thesis generation.",
-            outlook: ['Bullish', 'Bearish', 'Neutral'].includes(data.outlook) ? data.outlook : 'Neutral',
-            keyFactors: data.keyFactors || [],
-            confidenceScore: data.confidenceScore || 50
-        };
-
+        const result = JSON.parse(response.text || '{}');
         thesisCache.set(ticker, result);
         return result;
-
-    } catch (error) {
-        return {
-            thesis: "AI Module temporarily unavailable.",
-            outlook: "Neutral",
-            keyFactors: ["System Error"],
-            confidenceScore: 0
-        };
+    } catch {
+        return { thesis: "Analysis error.", outlook: "Neutral", keyFactors: [], confidenceScore: 0 };
     }
 }
 
 export async function generateCoachingInsight(result: PortfolioBacktestResult): Promise<CoachInsight> {
-    const cacheKey = `${result.strategy}-${result.period}`;
-    if (coachCache.has(cacheKey)) {
-        return coachCache.get(cacheKey)!;
-    }
-
     const ai = getAiClient();
-    const prompt = `Analyze the following trading backtest result and provide psychological coaching feedback.
-    Result Summary: ${JSON.stringify({
-        strategy: result.strategy,
-        winRate: result.winRate,
-        totalReturn: result.totalReturn,
-        maxDrawdown: result.maxDrawdown,
-        totalTrades: result.totalTrades,
-        cagr: result.cagr
-    })}
-    Determine the trader archetype, mental scores, and detected biases. Return as JSON.`;
-
+    const prompt = `Analyze this simulated trading performance and provide psychological coaching feedback. 
+    Strategy: ${result.strategy}, Period: ${result.period}, Total Return: ${result.totalReturn.toFixed(2)}%, Win Rate: ${result.winRate.toFixed(1)}%, Trades: ${result.totalTrades}.
+    Provide insights into the trader's behavioral profile.
+    RETURN STRICT JSON: {
+        "traderArchetype": "string",
+        "mentalCapitalScore": number,
+        "psychologicalTraits": {"discipline": number, "patience": number, "riskMgmt": number, "consistency": number},
+        "detectedBiases": ["string"],
+        "actionableFeedback": "string"
+    }`;
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        traderArchetype: { type: Type.STRING },
-                        mentalCapitalScore: { type: Type.NUMBER },
-                        psychologicalTraits: {
-                            type: Type.OBJECT,
-                            properties: {
-                                discipline: { type: Type.NUMBER },
-                                patience: { type: Type.NUMBER },
-                                riskMgmt: { type: Type.NUMBER },
-                                consistency: { type: Type.NUMBER }
-                            },
-                            required: ['discipline', 'patience', 'riskMgmt', 'consistency']
-                        },
-                        detectedBiases: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        actionableFeedback: { type: Type.STRING }
-                    },
-                    required: ['traderArchetype', 'mentalCapitalScore', 'psychologicalTraits', 'detectedBiases', 'actionableFeedback']
-                }
-            }
+            config: { responseMimeType: "application/json" }
         });
-
-        const data = JSON.parse(response.text || '{}');
-        coachCache.set(cacheKey, data);
-        return data;
-    } catch (error) {
-        console.error("Coach analysis error:", error);
+        return JSON.parse(response.text || '{}');
+    } catch {
         return {
-            traderArchetype: "Standard Executioner",
+            traderArchetype: "Unknown",
             mentalCapitalScore: 50,
             psychologicalTraits: { discipline: 50, patience: 50, riskMgmt: 50, consistency: 50 },
-            detectedBiases: ["Analysis Unavailable"],
-            actionableFeedback: "Keep refining your execution strategy."
+            detectedBiases: [],
+            actionableFeedback: "Analysis unavailable at this time."
         };
     }
 }
 
 export async function fetchLogisticsAnalysis(query: string): Promise<LogisticsAnalysis> {
     const ai = getAiClient();
+    const prompt = `Perform a deep logistics and supply chain analysis for the commodity/region: ${query}. 
+    Focus on tanker movements, port bottlenecks, and global chokepoints. 
+    Use Google Maps to verify specific locations mentioned. 
+    Provide a detailed summary and a bullish/bearish/neutral outlook.
+    Format your response as valid JSON embedded in text if necessary, but strictly provide the analysisText and outlook.`;
+    
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-lite-latest",
-            contents: `Analyze logistics for: ${query}. Identify current bottlenecks and strategic hotspots.`,
+            model: "gemini-3-flash-preview",
+            contents: prompt,
             config: {
                 tools: [{ googleMaps: {} }, { googleSearch: {} }],
             },
         });
 
-        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        const locations: MapLocation[] = groundingChunks
-            ?.map((chunk: any) => (chunk.maps ? {
-                uri: chunk.maps.uri,
-                title: chunk.maps.title,
-            } : null))
-            .filter((loc: any): loc is MapLocation => loc !== null && !!loc.uri && !!loc.title) ?? [];
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        const detectedLocations = groundingChunks
+            .map((chunk: any) => chunk.maps ? { title: chunk.maps.title, uri: chunk.maps.uri } : null)
+            .filter((loc: any) => loc !== null);
+
+        let analysisText = response.text || "No analysis available.";
+        let outlook: 'Bullish' | 'Bearish' | 'Neutral' = 'Neutral';
+
+        if (analysisText.toLowerCase().includes('bullish')) outlook = 'Bullish';
+        else if (analysisText.toLowerCase().includes('bearish')) outlook = 'Bearish';
 
         return {
-            analysisText: response.text || "No analysis available.",
-            outlook: response.text?.toLowerCase().includes('bullish') ? 'Bullish' : 
-                     response.text?.toLowerCase().includes('bearish') ? 'Bearish' : 'Neutral',
-            detectedLocations: locations,
+            analysisText,
+            outlook,
+            detectedLocations
         };
     } catch (error) {
-        console.error("Logistics analysis error:", error);
-        return {
-            analysisText: "Logistics data feed interrupted.",
-            outlook: "Neutral",
-            detectedLocations: []
-        };
+        console.error("Logistics analysis failed:", error);
+        return { analysisText: "Satellite uplink failed.", outlook: "Neutral", detectedLocations: [] };
     }
 }
