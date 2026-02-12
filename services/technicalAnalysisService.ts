@@ -1,7 +1,9 @@
+
 import type { OHLCV, TechnicalIndicators, Signals } from '../types';
 import { calculateFactorAttribution } from './factorAttributionService';
 
 const indicatorsCache = new Map<string, TechnicalIndicators>();
+
 const UI_SUGGESTED_RISK_CAPITAL = 2000;
 
 const createOhlcvCacheKey = (data: OHLCV[]): string => {
@@ -12,7 +14,7 @@ const createOhlcvCacheKey = (data: OHLCV[]): string => {
 };
 
 const getLastThursday = (year: number, month: number): Date => {
-    const lastDay = new Date(year, month + 1, 0);
+    const lastDay = new Date(year, month + 1, 0); 
     let day = lastDay.getDay(); 
     let diff = (day >= 4) ? (day - 4) : (day + 3);
     return new Date(year, month + 1, 0 - diff);
@@ -164,12 +166,20 @@ export const calculateIndicators = (data: OHLCV[]): TechnicalIndicators => {
     const sma200 = calculateSMA(closes, 200);
     const ema200 = calculateEMA(closes, 200);
     const rsi = calculateRSI(closes);
+    
     const bbUpper = sma20.map((m, i) => {
         if (isNaN(m)) return NaN;
         const slice = closes.slice(Math.max(0, i-19), i+1);
         const std = Math.sqrt(slice.reduce((s, c) => s + Math.pow(c - m, 2), 0) / 20);
         return m + (std * 2);
     });
+    const bbLower = sma20.map((m, i) => {
+        if (isNaN(m)) return NaN;
+        const slice = closes.slice(Math.max(0, i-19), i+1);
+        const std = Math.sqrt(slice.reduce((s, c) => s + Math.pow(c - m, 2), 0) / 20);
+        return m - (std * 2);
+    });
+    
     const kcUpper = sma20.map((m, i) => m + (atr[i] * 1.5));
     const isSqueezing = bbUpper.map((u, i) => u < (kcUpper[i] || 0));
     const oiChangePct: number[] = Array(Math.min(data.length, 5)).fill(0);
@@ -194,7 +204,7 @@ export const calculateIndicators = (data: OHLCV[]): TechnicalIndicators => {
         rvol: rvol, volatilityPct: volatilityPct, volEma5: calculateEMA(volumes, 5),
         volEma20: calculateEMA(volumes, 20), ema9: ema9, ema10: ema10, ema13: ema13, ema200: ema200,
         macdLine: [], macdSignal: [], rsi: rsi, stochRsi: [], sma20: sma20, sma50: sma50, sma200: sma200,
-        obv: [], avdm: [], xt: xt, ema9Xt: ema9Xt, ema21Xt: ema21Xt, bbUpper: bbUpper, kcUpper: kcUpper,
+        obv: [], avdm: [], xt: xt, ema9Xt: ema9Xt, ema21Xt: ema21Xt, bbUpper: bbUpper, bbLower: bbLower, bbMid: sma20,
         isSqueezing: isSqueezing, oiChangePct: oiChangePct, oiSmartMoneyScore: [], high52Week: high52Week
     };
     indicatorsCache.set(cacheKey, indicators);
@@ -244,6 +254,7 @@ export const generateSignals = (indicators: TechnicalIndicators, historical: OHL
     const { expiryDate, daysToExpiry } = getNextExpiryInfo(new Date());
     const high52Week = indicators.high52Week || currentData.close;
     const distFrom52WHigh = ((high52Week - currentData.close) / high52Week) * 100;
+    
     return {
         volumeSignal: volumeSignal, trendSignal: trendSignal, volumeEmaSignal: 'Neutral',
         volumeSpikeSignalDate: volumeSpikeSignalDate, stopLoss: stopLoss, target: target,
@@ -254,6 +265,12 @@ export const generateSignals = (indicators: TechnicalIndicators, historical: OHL
         vwlmBuySignal: vwlmBuy, vwlmBuySignalDate: vwlmBuyDate, vwlmSellSignal: false,
         vwlmSellSignalDate: '', vwlmStrength: indicators.xt[lastIndex] || 0,
         factors: calculateFactorAttribution(indicators, historical),
-        distFrom52WHigh: distFrom52WHigh
+        distFrom52WHigh: distFrom52WHigh,
+        accumulationSignal: false,
+        accumulationDate: '',
+        accumulationStatus: 'None',
+        accumulationMovePct: 0,
+        accumulationLow: 0,
+        accumulationDays: 0
     };
 };

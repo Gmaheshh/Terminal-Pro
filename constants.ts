@@ -1,14 +1,14 @@
 
 import React from 'react';
-import type { Column, ProcessedStock, TabType, PortfolioBacktestResult, EmaSignalResult, Sentiment, ArbitrageOpportunity } from './types';
+import type { Column, ProcessedStock, TabType, PortfolioBacktestResult, OHLCV, EmaSignalResult, OIAnalyticsData } from './types';
+import { InfoIcon } from './components/Icons';
 
 export const AllFOTickers = [
-  '^NSEI', '^NSEBANK', // Primary Indices
+  '^NSEI', '^NSEBANK', 
   'AARTIIND.NS', 'ABB.NS', 'ABBOTINDIA.NS', 'ABCAPITAL.NS', 'ABFRL.NS', 'ACC.NS', 'ADANIENT.NS', 'ADANIPORTS.NS', 'ALKEM.NS', 'AMBUJACEM.NS', 
   'APOLLOHOSP.NS', 'APOLLOTYRE.NS', 'ASHOKLEY.NS', 'ASIANPAINT.NS', 'ASTRAL.NS', 'ATUL.NS', 'AUBANK.NS', 'AUROPHARMA.NS', 'AXISBANK.NS', 
   'BAJAJ-AUTO.NS', 'BAJAJFINSV.NS', 'BAJFINANCE.NS', 'BALKRISIND.NS', 'BALRAMCHIN.NS', 'BANDHANBNK.NS', 'BANKBARODA.NS', 'BATAINDIA.NS', 
   'BEL.NS', 'BERGEPAINT.NS', 'BHARATFORG.NS', 'BHARTIARTL.NS', 'BHEL.NS', 'BIOCON.NS', 'BPCL.NS', 'BRITANNIA.NS', 'BSOFT.NS', 'CANBK.NS', 
-  /* Fixed missing opening quote for the first ticker in this line */
   'CANFINHOME.NS', 'CHAMBLFERT.NS', 'CHOLAFIN.NS', 'CIPLA.NS', 'COALINDIA.NS', 'COFORGE.NS', 'COLPAL.NS', 'CONCOR.NS', 'COROMANDEL.NS', 
   'CROMPTON.NS', 'CUMMINSIND.NS', 'DABUR.NS', 'DALBHARAT.NS', 'DEEPAKNTR.NS', 'DELTACORP.NS', 'DIVISLAB.NS', 'DIXON.NS', 'DLF.NS', 
   'DRREDDY.NS', 'EICHERMOT.NS', 'ESCORTS.NS', 'EXIDEIND.NS', 'FEDERALBNK.NS', 'GAIL.NS', 'GLENMARK.NS', 'GMRINFRA.NS', 'GNFC.NS', 
@@ -28,171 +28,146 @@ export const AllFOTickers = [
 
 export const Tickers: string[] = AllFOTickers;
 
-export const TABS: TabType[] = ['Volume/Trend', 'VWLM', 'Derivatives Desk', 'Payoff Visualizer', 'Portfolio Maker', 'Backtest Simulation', 'Strategy Backtester', 'Forward Test', 'Recent News', 'User Manual'];
+export type MainCategory = 'Home' | 'Intelligence Hub' | 'Investing Tree' | 'Trading Tree' | 'User Manual';
 
-const renderSignal = (text: string, type: 'buy' | 'sell' | 'neutral' | 'bullish' | 'bearish') => {
-    let colorClass = 'text-bb-muted';
-    if (type === 'buy' || type === 'bullish') {
-        colorClass = 'text-bb-green font-bold';
-    } else if (type === 'sell' || type === 'bearish') {
-        colorClass = 'text-bb-red font-bold';
-    }
-    return React.createElement('span', { className: colorClass }, text.toUpperCase());
+export const CATEGORIES: MainCategory[] = ['Home', 'Intelligence Hub', 'Investing Tree', 'Trading Tree', 'User Manual'];
+
+export const CATEGORY_MAP: Record<MainCategory, TabType[]> = {
+    'Home': [],
+    'Intelligence Hub': ['Recent News', 'Macro Analysis'],
+    'Investing Tree': ['Company Analysis', 'Portfolio Maker'],
+    'Trading Tree': ['Volume/Trend', 'VWLM', 'Strategy Backtester', 'Derivatives Desk', 'OI Analytics', 'Payoff Visualizer', 'Backtest Simulation', 'Position Calculator'],
+    'User Manual': ['User Manual']
 };
 
-const renderTradeButton = (ticker: string, action: 'buy' | 'sell', onFetch: (ticker: string, type: 'thesis') => void) => (
-    React.createElement('button', 
-      { 
-        onClick: (e) => { e.stopPropagation(); onFetch(ticker, 'thesis'); }, 
-        className: `min-w-[55px] px-3 py-1.5 border text-xs font-bold uppercase transition-all hover:scale-105 active:scale-95 flex items-center justify-center ${
-            action === 'buy' 
-            ? "bg-bb-green/10 text-bb-green border-bb-green hover:bg-bb-green hover:text-black shadow-[0_0_5px_rgba(0,255,0,0.3)]" 
-            : "bg-bb-red/10 text-bb-red border-bb-red hover:bg-bb-red hover:text-black shadow-[0_0_5px_rgba(255,51,51,0.3)]"
-        }`
-      }, 
-      [
-        action.toUpperCase(),
-        React.createElement('span', { key: 'arr', className: "ml-1 text-[9px]" }, ">>")
-      ]
-    )
-);
+export const TABS: TabType[] = ['Volume/Trend', 'VWLM', 'Derivatives Desk', 'OI Analytics', 'Payoff Visualizer', 'Macro Analysis', 'Portfolio Maker', 'Backtest Simulation', 'Strategy Backtester', 'Recent News', 'Position Calculator', 'User Manual', 'Company Analysis'];
 
-const renderMonitorButton = (stock: ProcessedStock, onMonitor: (stock: ProcessedStock) => void) => (
-    React.createElement('button', 
-      { 
-        onClick: (e) => { e.stopPropagation(); onMonitor(stock); }, 
-        className: "bg-bb-orange/10 text-bb-orange border border-bb-orange px-2 py-1.5 text-[10px] font-bold uppercase hover:bg-bb-orange hover:text-black transition-all"
-      }, 
-      "EXEC"
-    )
-);
+const renderSignal = (text: string, type: 'buy' | 'sell' | 'neutral' | 'bullish' | 'bearish') => {
+    let colorClass = 'text-pro-muted';
+    let bgClass = 'bg-slate-100';
+    if (type === 'buy' || type === 'bullish') {
+        colorClass = 'text-pro-green font-bold';
+        bgClass = 'bg-pro-green/10';
+    } else if (type === 'sell' || type === 'bearish') {
+        colorClass = 'text-pro-red font-bold';
+        bgClass = 'bg-pro-red/10';
+    }
+    return React.createElement('span', { className: `px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${bgClass} ${colorClass}` }, text);
+};
 
-const renderSentimentButton = (ticker: string, onFetch: (ticker: string, type: 'sentiment') => void) => (
-  React.createElement('button', 
-    { 
-      onClick: (e) => { e.stopPropagation(); onFetch(ticker, 'sentiment'); }, 
-      className: "text-bb-blue hover:text-white hover:underline uppercase text-[10px]"
-    }, 
-    "[ NEWS ]"
-  )
+const renderDate = (date: string, historical: OHLCV[]) => {
+    if (!date) return React.createElement('span', { className: 'text-pro-muted italic opacity-50' }, 'N/A');
+    const lastTwoDates = historical.slice(-2).map(h => h.date);
+    const isRecent = lastTwoDates.includes(date);
+    return React.createElement('span', {
+        className: isRecent 
+            ? 'text-pro-primary font-bold bg-pro-primary/10 px-2 py-0.5 rounded-full ring-1 ring-pro-primary/20 animate-pulse' 
+            : 'text-pro-muted font-medium'
+    }, date);
+};
+
+const renderActionGroup = (stock: ProcessedStock, onMonitor: (stock: ProcessedStock) => void, onAnalyze: (ticker: string) => void) => (
+    React.createElement('div', { className: 'flex items-center space-x-2' }, [
+        React.createElement('button', 
+          { 
+            key: 'trade',
+            onClick: (e: any) => { e.stopPropagation(); onMonitor(stock); }, 
+            className: `px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all shadow-sm active:scale-95 ${
+                stock.signals.trendSignal === 'Downtrend' 
+                ? "bg-pro-red text-white hover:bg-red-600" 
+                : "bg-pro-green text-white hover:bg-emerald-600"
+            }`
+          } as any, 
+          stock.signals.trendSignal === 'Downtrend' ? 'SHORT' : 'LONG'
+        ),
+        React.createElement('button',
+          {
+            key: 'info',
+            onClick: (e: any) => { e.stopPropagation(); onAnalyze(stock.ticker); },
+            className: "p-2 rounded-lg bg-pro-surface text-pro-muted hover:text-pro-primary transition-all border border-pro-border",
+            title: "Omni-Analysis"
+          } as any,
+          React.createElement(InfoIcon, { className: "w-3.5 h-3.5" })
+        )
+    ])
 );
 
 export const VOLUME_TREND_COLUMNS = (
-    onFetchSentiment: (ticker: string, type: 'sentiment' | 'thesis') => void, 
+    onTickerClick: (ticker: string) => void, 
     onMonitor: (stock: ProcessedStock) => void
 ): Column<ProcessedStock>[] => [
-    { header: 'Ticker', accessor: (d) => React.createElement('span', { className: 'text-bb-blue font-bold' }, d.ticker), sortable: true },
-    { header: 'Price', accessor: (d) => d.data.currentPrice.toFixed(2), sortable: true },
     { 
-      header: 'Signal Date', 
-      accessor: (d) => {
-          const date = d.signals.volumeSpikeSignalDate;
-          const isToday = date === d.data.historical[d.data.historical.length - 1].date;
-          return React.createElement('span', { className: isToday ? 'text-bb-orange font-bold' : 'text-bb-blue' }, date || '-');
-      },
-      sortable: true
+        header: 'Ticker', 
+        accessor: (d) => React.createElement('button', { 
+            onClick: (e: any) => { e.stopPropagation(); onTickerClick(d.ticker); },
+            className: 'text-pro-primary font-bold hover:underline transition-all tracking-tight'
+        } as any, d.ticker), 
+        sortable: true 
     },
-    { header: '52W Dist%', accessor: (d) => React.createElement('span', { className: (d.signals.distFrom52WHigh || 0) < 5 ? 'text-bb-green' : 'text-bb-text' }, `${(d.signals.distFrom52WHigh || 0).toFixed(1)}%`), sortable: true },
-    { 
-      header: 'OI Build', 
-      accessor: (d) => {
-          const val = d.signals.oiBuild;
-          const color = val > 5 ? 'text-bb-green font-bold' : val > 0 ? 'text-bb-blue' : 'text-bb-muted';
-          return React.createElement('span', { className: color }, `${val > 0 ? '+' : ''}${val.toFixed(1)}%`);
-      },
-      sortable: true
-    },
-    { 
-      header: 'Expiry', 
-      accessor: (d) => {
-          const nearExpiry = d.signals.daysToExpiry <= 7;
-          const label = `${d.signals.expiryDate.split('-')[2]}-${new Date(d.signals.expiryDate).toLocaleString('default', { month: 'short' }).toUpperCase()}`;
-          return React.createElement('span', { className: nearExpiry ? 'text-bb-orange font-bold' : 'text-bb-muted' }, `${label} (T-${d.signals.daysToExpiry})`);
-      },
-      sortable: true 
-    },
-    { header: 'RVOL', accessor: (d) => d.indicators.rvol[d.indicators.rvol.length - 1].toFixed(2), sortable: true },
-    { header: 'Trend', accessor: (d) => renderSignal(d.signals.trendSignal, d.signals.trendSignal === 'Uptrend' ? 'buy' : 'sell') },
-    { header: 'ADX', accessor: (d) => d.indicators.adx[d.indicators.adx.length - 1]?.toFixed(2) || 'N/A', sortable: true },
-    { 
-        header: 'Action', 
-        accessor: (d) => {
-            const action = d.signals.trendSignal === 'Downtrend' ? 'sell' : 'buy';
-            return React.createElement('div', { className: 'flex items-center space-x-2' }, [
-                renderTradeButton(d.ticker, action, onFetchSentiment),
-                renderMonitorButton(d, onMonitor),
-                renderSentimentButton(d.ticker, onFetchSentiment)
-            ]);
-        }
-    },
+    { header: 'Price', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.data.currentPrice.toFixed(2)), sortable: true },
+    { header: 'Signal Date', accessor: (d) => renderDate(d.signals.volumeSpikeSignalDate, d.data.historical), sortable: true },
+    { header: 'SL', accessor: (d) => React.createElement('span', { className: 'text-pro-red font-mono font-medium' }, d.signals.stopLoss.toFixed(2)), sortable: true },
+    { header: 'TP', accessor: (d) => React.createElement('span', { className: 'text-pro-green font-mono font-medium' }, d.signals.target.toFixed(2)), sortable: true },
+    { header: 'OI Build', accessor: (d) => React.createElement('span', { className: d.signals.oiBuild > 0 ? 'text-pro-green' : 'text-pro-red' }, `${d.signals.oiBuild.toFixed(1)}%`), sortable: true },
+    { header: 'RVOL', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.indicators.rvol[d.indicators.rvol.length - 1].toFixed(2)), sortable: true },
+    { header: 'Trend', accessor: (d) => renderSignal(d.signals.trendSignal, d.signals.trendSignal === 'Uptrend' ? 'bullish' : 'bearish') },
+    { header: 'ADX', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.indicators.adx[d.indicators.adx.length - 1]?.toFixed(2) || 'N/A'), sortable: true },
+    { header: 'Action', accessor: (d) => renderActionGroup(d, onMonitor, onTickerClick) },
 ];
 
 export const VWLM_COLUMNS = (
-    onFetchSentiment: (ticker: string, type: 'sentiment' | 'thesis') => void,
+    onTickerClick: (ticker: string) => void,
     onMonitor: (stock: ProcessedStock) => void
 ): Column<ProcessedStock>[] => [
-    { header: 'Ticker', accessor: (d) => React.createElement('span', { className: 'text-bb-blue font-bold' }, d.ticker), sortable: true },
-    { header: 'Price', accessor: (d) => d.data.currentPrice.toFixed(2), sortable: true },
-    { 
-      header: 'Signal Date', 
-      accessor: (d) => {
-          const date = d.signals.vwlmBuySignalDate || d.signals.vwlmSellSignalDate;
-          const isToday = date === d.data.historical[d.data.historical.length - 1].date;
-          return React.createElement('span', { className: isToday ? 'text-bb-orange font-bold' : 'text-bb-blue' }, date || '-');
-      },
-      sortable: true
-    },
+    { header: 'Ticker', accessor: (d) => React.createElement('button', { onClick: (e: any) => { e.stopPropagation(); onTickerClick(d.ticker); }, className: 'text-pro-primary font-bold hover:underline transition-all tracking-tight' } as any, d.ticker), sortable: true },
+    { header: 'Price', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.data.currentPrice.toFixed(2)), sortable: true },
+    { header: 'Signal Date', accessor: (d) => renderDate(d.signals.vwlmBuySignalDate || d.signals.vwlmSellSignalDate, d.data.historical), sortable: true },
+    { header: 'SL', accessor: (d) => React.createElement('span', { className: 'text-pro-red font-mono font-medium' }, (d.signals.vwlmStopLoss || d.signals.stopLoss).toFixed(2)), sortable: true },
+    { header: 'TP', accessor: (d) => React.createElement('span', { className: 'text-pro-green font-mono font-medium' }, (d.signals.vwlmTarget || d.signals.target).toFixed(2)), sortable: true },
     { header: 'Signal', accessor: (d) => renderSignal(d.signals.vwlmBuySignal ? 'Buy' : 'Sell', d.signals.vwlmBuySignal ? 'buy' : 'sell') },
-    { header: 'OI Build', accessor: (d) => `${d.signals.oiBuild.toFixed(1)}%`, sortable: true },
-    { header: 'ADX', accessor: (d) => d.indicators.adx[d.indicators.adx.length - 1]?.toFixed(2) || 'N/A', sortable: true },
-    { 
-        header: 'Action', 
-        accessor: (d) => {
-            const action = d.signals.vwlmBuySignal ? 'buy' : 'sell';
-            return React.createElement('div', { className: 'flex items-center space-x-2' }, [
-                renderTradeButton(d.ticker, action, onFetchSentiment),
-                renderMonitorButton(d, onMonitor),
-                renderSentimentButton(d.ticker, onFetchSentiment)
-            ]);
-        }
-    },
+    { header: 'OI Build', accessor: (d) => React.createElement('span', { className: d.signals.oiBuild > 0 ? 'text-pro-green' : 'text-pro-red' }, `${d.signals.oiBuild.toFixed(1)}%`), sortable: true },
+    { header: 'ADX', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.indicators.adx[d.indicators.adx.length - 1]?.toFixed(2) || 'N/A'), sortable: true },
+    { header: 'Action', accessor: (d) => renderActionGroup(d, onMonitor, onTickerClick) },
 ];
 
 export const PORTFOLIO_SIMULATION_COLUMNS = (onDetails: (result: PortfolioBacktestResult) => void): Column<PortfolioBacktestResult>[] => [
-    { header: 'Strategy', accessor: (d) => React.createElement('span', { className: 'text-bb-orange' }, d.strategy.toUpperCase()), sortable: true },
+    { header: 'Strategy', accessor: (d) => React.createElement('span', { className: 'text-pro-text font-bold' }, d.strategy.toUpperCase()), sortable: true },
     { header: 'Period', accessor: 'period', sortable: true },
-    { header: 'Capital', accessor: (d) => d.initialCapital.toLocaleString() },
-    { header: 'Final', accessor: (d) => d.finalCapital.toLocaleString('en-IN', { maximumFractionDigits: 0 }), sortable: true },
-    { header: 'Return', accessor: (d) => {
+    { header: 'Final Equity', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.finalCapital.toLocaleString('en-IN', { maximumFractionDigits: 0 })), sortable: true },
+    { header: 'Alpha Return', accessor: (d) => {
         const value = d.totalReturn;
-        const color = value > 0 ? 'text-bb-green' : value < 0 ? 'text-bb-red' : 'text-bb-muted';
-        const sign = value > 0 ? '+' : '';
-        return React.createElement('span', { className: `${color} font-bold` }, `${sign}${value.toFixed(2)}%`);
+        const color = value > 0 ? 'text-pro-green' : value < 0 ? 'text-pro-red' : 'text-pro-muted';
+        return React.createElement('span', { className: `${color} font-bold` }, `${value > 0 ? '+' : ''}${value.toFixed(2)}%`);
       }, 
       sortable: true 
     },
-    { header: 'Trades', accessor: 'totalTrades', sortable: true },
-    { header: 'Win %', accessor: (d) => `${d.winRate.toFixed(1)}%`, sortable: true },
-    { header: 'Log', accessor: (d) => React.createElement('button', { 
+    { header: 'Win Rate', accessor: (d) => `${d.winRate.toFixed(1)}%`, sortable: true },
+    { header: 'Analytics', accessor: (d) => React.createElement('button', { 
         onClick: (e: React.MouseEvent) => { e.stopPropagation(); onDetails(d); }, 
-        className: "text-bb-orange hover:text-white uppercase text-[10px]" 
-    } as React.ButtonHTMLAttributes<HTMLButtonElement>, "[ VIEW LOG ]")},
+        className: "px-3 py-1 bg-pro-surface text-pro-muted hover:text-pro-primary hover:border-pro-primary/30 border border-pro-border rounded-lg text-[10px] font-bold transition-all" 
+    } as any, "VIEW_REPORT")},
 ];
 
 export const EMA_DASHBOARD_COLUMNS = (): Column<EmaSignalResult>[] => [
     { header: 'Stock', accessor: 'ticker', sortable: true },
-    { header: 'Price', accessor: 'price', sortable: true },
-    {
-        header: 'Signal',
-        accessor: (d) => {
-            const signalType = d.signal.split(" ")[0];
-            const type = signalType === 'BUY' ? 'buy' : signalType === 'SELL' ? 'sell' : 'neutral';
-            return renderSignal(signalType, type as any);
-        },
-        sortable: true
-    },
+    { header: 'Price', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.price.toFixed(2)), sortable: true },
+    { header: 'Signal', accessor: (d) => renderSignal(d.signal, d.signal.includes('BUY') ? 'buy' : d.signal.includes('SELL') ? 'sell' : 'neutral'), sortable: true },
     { header: 'EMA9', accessor: (d) => d.ema9.toFixed(2), sortable: true },
     { header: 'EMA13', accessor: (d) => d.ema13.toFixed(2), sortable: true },
     { header: 'MACD', accessor: (d) => d.macd.toFixed(2), sortable: true },
     { header: 'RSI', accessor: (d) => d.rsi.toFixed(2), sortable: true },
+    { header: 'StochRSI', accessor: (d) => d.stochRsi.toFixed(2), sortable: true },
+];
+
+export const OI_ANALYTICS_COLUMNS = (): Column<OIAnalyticsData>[] => [
+    { header: 'Ticker', accessor: (d) => React.createElement('span', { className: 'font-bold text-pro-primary' }, d.ticker.replace('.NS', '')), sortable: true },
+    { header: 'Spot', accessor: (d) => React.createElement('span', { className: 'font-mono' }, d.spot.toFixed(2)), sortable: true },
+    { header: 'Futures', accessor: (d) => React.createElement('span', { className: 'font-mono text-pro-accent' }, d.futures.toFixed(2)), sortable: true },
+    { header: 'Current OI', accessor: (d) => React.createElement('span', { className: 'font-mono' }, (d.currentMonthOI / 1000000).toFixed(2) + 'M'), sortable: true },
+    { header: 'Total OI', accessor: (d) => React.createElement('span', { className: 'font-mono font-bold' }, (d.totalOI / 1000000).toFixed(2) + 'M'), sortable: true },
+    { header: 'Rollover %', accessor: (d) => React.createElement('span', { className: 'font-mono font-black text-pro-primary' }, d.rolloverPct.toFixed(2) + '%'), sortable: true },
+    { header: 'Trend', accessor: (d) => {
+        const color = d.trend === 'UPWARD' ? 'text-pro-green' : d.trend === 'DOWNWARD' ? 'text-pro-red' : 'text-pro-muted';
+        return React.createElement('span', { className: `${color} font-black text-[10px]` }, d.trend);
+    }, sortable: true },
 ];

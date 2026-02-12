@@ -1,4 +1,3 @@
-
 import type { OHLCV, TechnicalIndicators, Signals } from '../types';
 import { calculateFactorAttribution } from './factorAttributionService';
 
@@ -454,6 +453,7 @@ export const generateSignals = (indicators: TechnicalIndicators, historical: OHL
     
     const oiBuild = indicators.oiChangePct[lastIndex] || 0;
 
+    // Default values for accumulation signals to satisfy the Signals interface
     return {
         volumeSignal,
         trendSignal,
@@ -478,6 +478,12 @@ export const generateSignals = (indicators: TechnicalIndicators, historical: OHL
         vwlmStopLoss: vwlmStop,
         vwlmTarget: vwlmTgt,
         
-        factors
+        factors,
+        accumulationSignal: false,
+        accumulationDate: '',
+        accumulationStatus: 'None',
+        accumulationMovePct: 0,
+        accumulationLow: 0,
+        accumulationDays: 0
     };
 };

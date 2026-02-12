@@ -1,32 +1,21 @@
-import React, { useMemo } from 'react';
-import type { Sentiment, TechnicalInsight, SignalFactors } from '../types';
-import { LinkIcon } from './Icons';
+import React from 'react';
+import type { ComprehensiveAnalysis, ProcessedStock } from '../types';
+import { BrainCircuitIcon, LinkIcon, InfoIcon } from './Icons';
 import { Loader } from './Loader';
 
 interface AnalysisModalProps {
   isOpen: boolean;
   onClose: () => void;
   ticker: string | null;
-  sentiment: Sentiment | null;
-  technicalThesis: TechnicalInsight | null;
-  factors?: SignalFactors; 
-  activeTab: 'sentiment' | 'thesis';
-  setActiveTab: (tab: 'sentiment' | 'thesis') => void;
+  data: ComprehensiveAnalysis | null;
   isLoading: boolean;
+  stock?: ProcessedStock;
 }
 
-const ProgressBar: React.FC<{ label: string, value: number, colorClass: string }> = ({ label, value, colorClass }) => (
-    <div className="mb-3">
-        <div className="flex justify-between text-xs font-mono uppercase mb-1">
-            <span className="text-bb-muted">{label}</span>
-            <span className="text-white font-bold">{value}%</span>
-        </div>
-        <div className="w-full bg-bb-black h-2 border border-bb-border">
-            <div 
-                className={`h-full ${colorClass} transition-all duration-500 ease-out`} 
-                style={{ width: `${value}%` }}
-            />
-        </div>
+const IndicatorBadge: React.FC<{ label: string, value: string | number, color?: string }> = ({ label, value, color = "text-pro-text" }) => (
+    <div className="flex justify-between items-center py-2.5 border-b border-pro-border/40 text-[10px]">
+        <span className="font-bold text-pro-muted uppercase tracking-tighter">{label}</span>
+        <span className={`font-black ${color}`}>{value}</span>
     </div>
 );
 
@@ -34,156 +23,183 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({
     isOpen, 
     onClose, 
     ticker, 
-    sentiment, 
-    technicalThesis, 
-    factors,
-    activeTab, 
-    setActiveTab, 
-    isLoading 
+    data,
+    isLoading,
+    stock
 }) => {
   if (!isOpen) return null;
 
   const getSentimentColor = (val: string) => {
     switch (val) {
-      case 'Bullish': return 'text-bb-green';
-      case 'Bearish': return 'text-bb-red';
-      case 'Neutral': return 'text-bb-text';
-      default: return 'text-bb-orange';
+      case 'Bullish': return 'text-pro-green';
+      case 'Bearish': return 'text-pro-red';
+      default: return 'text-pro-primary';
     }
   };
 
-  // Filter sources to find official NSE/BSE or corporate links
-  const officialSources = useMemo(() => {
-      if (!sentiment?.sources) return [];
-      const keywords = ['nseindia', 'bseindia', 'corporate', 'investor', 'filing', 'quarterly', 'result', 'pdf'];
-      return sentiment.sources.filter(s => 
-          keywords.some(k => s.uri.toLowerCase().includes(k) || s.title.toLowerCase().includes(k))
-      );
-  }, [sentiment]);
+  const getActiveStrategy = () => {
+    if (!stock) return null;
+    const signals = [];
+    if (stock.signals.volumeSignal === 'Spike') signals.push("VOLATILITY BREAKOUT");
+    if (stock.signals.vwlmBuySignal) signals.push("VWLM (LONG)");
+    if (stock.signals.vwlmSellSignal) signals.push("VWLM (SHORT)");
+    return signals.length > 0 ? signals : null;
+  };
+
+  const strategies = getActiveStrategy();
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 font-mono"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4 font-sans"
       onClick={onClose}
     >
       <div
-        className="bg-bb-black w-full max-w-2xl border-2 border-bb-orange shadow-[0_0_20px_rgba(255,153,0,0.2)]"
+        className="bg-white w-full max-w-6xl rounded-[3rem] shadow-heavy flex flex-col max-h-[95vh] overflow-hidden border border-pro-border"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-bb-orange text-bb-black flex justify-between items-center px-3 py-1 font-bold">
-          <span>AI_ANALYSIS_MATRIX_V3.1_FILING_SYNC</span>
-          <button onClick={onClose} className="hover:bg-bb-black hover:text-bb-orange px-1 transition-colors">
-            [X]
+        <div className="bg-pro-primary text-white flex justify-between items-center px-10 py-6 font-black tracking-widest shrink-0">
+          <div className="flex items-center space-x-4">
+            <div className="bg-white/20 p-2 rounded-xl">
+                <BrainCircuitIcon className="w-6 h-6" />
+            </div>
+            <div>
+                <span className="text-sm font-extrabold block uppercase tracking-tighter">Alpha Intelligence Matrix</span>
+                <span className="text-[10px] opacity-60 uppercase">Omni-Channel Signal Engine Active</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="hover:bg-white/20 p-3 rounded-full transition-colors font-bold group">
+            <svg className="w-6 h-6 group-hover:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
         
-        <div className="flex border-b border-bb-border">
-            <button 
-                onClick={() => setActiveTab('sentiment')}
-                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider ${activeTab === 'sentiment' ? 'bg-bb-panel text-bb-orange' : 'text-bb-muted hover:text-white'}`}
-            >
-                <span className="mr-2">MACRO & FILINGS</span>
-                {activeTab === 'sentiment' && <span className="text-bb-orange">●</span>}
-            </button>
-            <button 
-                onClick={() => setActiveTab('thesis')}
-                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider ${activeTab === 'thesis' ? 'bg-bb-panel text-bb-orange' : 'text-bb-muted hover:text-white'}`}
-            >
-                <span className="mr-2">QUANT THESIS</span>
-                {activeTab === 'thesis' && <span className="text-bb-orange">●</span>}
-            </button>
-        </div>
-
-        <div className="p-6 min-h-[300px]">
-          <div className="border-b border-bb-border pb-4 mb-4 flex justify-between items-end">
-              <h2 className="text-3xl font-bold text-white uppercase tracking-wider">Target: <span className="text-bb-blue">{ticker}</span></h2>
-              {isLoading && <span className="text-bb-orange text-xs animate-pulse">ANALYZING QUARTERLY REPORTS...</span>}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-10 space-y-10">
+          <div className="border-b border-pro-border pb-8 flex flex-col md:flex-row justify-between items-end gap-6">
+              <div>
+                <h2 className="text-5xl font-black text-pro-text uppercase tracking-tighter">Target: <span className="text-pro-primary">{ticker}</span></h2>
+                <div className="flex items-center mt-2 space-x-3">
+                    <span className="text-pro-muted text-[11px] tracking-[0.2em] font-black uppercase">Institutional Scan Process: Nominal</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-pro-green animate-pulse"></span>
+                </div>
+              </div>
+              
+              {/* Strategy Verdict Component */}
+              <div className="bg-pro-bg border border-pro-border rounded-3xl p-6 min-w-[320px] flex flex-col justify-center text-center shadow-soft">
+                    <span className="text-[10px] font-black text-pro-muted uppercase mb-2 tracking-[0.2em]">Live Strategy Signal</span>
+                    {strategies ? (
+                        <div className="space-y-1">
+                            {strategies.map(s => (
+                                <div key={s} className="text-xl font-black text-pro-primary uppercase tracking-tight">{s}</div>
+                            ))}
+                            <div className="text-[9px] font-bold text-pro-green uppercase animate-pulse">>> ACTIVE_CONVICTION</div>
+                        </div>
+                    ) : (
+                        <div>
+                            <div className="text-2xl font-black text-pro-muted opacity-40 uppercase tracking-tighter italic">NO SIGNAL</div>
+                            <div className="text-[9px] font-bold text-pro-muted/40 uppercase mt-1">Quantitative Thresholds Not Triggered</div>
+                        </div>
+                    )}
+              </div>
           </div>
 
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12">
-                <Loader className="w-12 h-12 text-bb-orange" />
-                <p className="mt-4 text-bb-orange text-xs blink">PROBING EXCHANGE FILINGS...</p>
+            <div className="flex flex-col items-center justify-center py-40">
+                <Loader className="w-16 h-16 text-pro-primary mb-6" />
+                <p className="text-pro-primary text-xs font-black tracking-[0.4em] animate-pulse">Establishing Neural Uplink...</p>
+            </div>
+          ) : data ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-fade-in pb-10">
+                
+                {/* Metrics & Quants Column */}
+                <div className="lg:col-span-4 space-y-8">
+                    {stock && (
+                        <div className="bg-pro-surface border border-pro-border p-6 rounded-3xl shadow-sm">
+                            <h3 className="text-[10px] font-black text-pro-primary uppercase mb-6 tracking-widest border-b border-pro-border pb-3 flex items-center">
+                                <InfoIcon className="w-3.5 h-3.5 mr-2" /> Live Market Pulse
+                            </h3>
+                            <div className="space-y-1">
+                                <IndicatorBadge label="Institutional Price" value={`₹${stock.data.currentPrice.toFixed(2)}`} color="text-pro-text" />
+                                <IndicatorBadge label="Trend (ADX)" value={stock.indicators.adx[stock.indicators.adx.length-1].toFixed(2)} color="text-pro-primary" />
+                                <IndicatorBadge label="Momentum (RSI)" value={stock.indicators.rsi[stock.indicators.rsi.length-1].toFixed(1)} color={stock.indicators.rsi[stock.indicators.rsi.length-1] > 60 ? "text-pro-green" : "text-pro-text"} />
+                                <IndicatorBadge label="Conviction (RVOL)" value={stock.indicators.rvol[stock.indicators.rvol.length-1].toFixed(2)} color="text-pro-accent" />
+                                <IndicatorBadge label="OI Intake" value={`${stock.signals.oiBuild.toFixed(2)}%`} color={stock.signals.oiBuild > 0 ? "text-pro-green" : "text-pro-red"} />
+                                <IndicatorBadge label="Beta/Vol (ATR)" value={stock.indicators.atr[stock.indicators.atr.length-1].toFixed(2)} />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white border border-pro-border p-6 rounded-3xl shadow-sm">
+                        <h3 className="text-[10px] font-black text-pro-primary uppercase mb-6 tracking-widest border-b border-pro-border pb-3">Fibonacci Retracement (30D)</h3>
+                        {data.fibonacciLevels ? (
+                          <div className="space-y-3 text-[11px] font-mono">
+                              <FibRow label="Resistance (1.0)" value={data.fibonacciLevels.level100} />
+                              <FibRow label="Deep (0.618)" value={data.fibonacciLevels.level618} />
+                              <FibRow label="Golden (0.5)" value={data.fibonacciLevels.level50} highlighted />
+                              <FibRow label="Pivot (0.382)" value={data.fibonacciLevels.level382} />
+                              <FibRow label="Base (0)" value={data.fibonacciLevels.level0} />
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-[10px] text-pro-muted uppercase font-bold italic opacity-40">Calculating levels...</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* AI Reasoning & Narrative Column */}
+                <div className="lg:col-span-8 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <HighlightCard label="Market Bias" value={data.sentiment} color={getSentimentColor(data.sentiment)} />
+                        <HighlightCard label="Breakout Conviction" value={`${data.breakoutPotential}%`} />
+                        <HighlightCard label="Pattern Matrix" value={data.candlestickPattern} isSmall />
+                    </div>
+
+                    <div className="bg-slate-50 border-l-8 border-pro-primary p-10 rounded-3xl relative overflow-hidden shadow-soft">
+                        <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-8xl font-black text-pro-primary pointer-events-none tracking-tighter">ALPHA</div>
+                        <h3 className="text-xs font-black text-pro-primary uppercase mb-6 tracking-[0.2em] flex items-center">
+                            <BrainCircuitIcon className="w-5 h-5 mr-3" /> Neural Strategy Thesis
+                        </h3>
+                        <p className="text-lg text-pro-text font-bold leading-relaxed border-l-4 border-pro-border/40 pl-8 uppercase">
+                            "{data.alphaReasoning}"
+                        </p>
+                    </div>
+
+                    <div className="bg-white border border-pro-border p-8 rounded-3xl shadow-sm relative">
+                        <h3 className="text-[10px] font-black text-pro-primary uppercase mb-4 tracking-widest">Macro & News Synthesis</h3>
+                        <p className="text-[13px] text-pro-muted font-medium leading-relaxed uppercase pb-6 mb-6 italic border-b border-pro-border/50">
+                            {data.newsSummary}
+                        </p>
+                        <div className="flex items-center space-x-3 text-[9px] text-pro-muted font-black tracking-widest">
+                            <LinkIcon className="w-3.5 h-3.5" />
+                            <span>Verified Exchange Intelligence Feed</span>
+                        </div>
+                    </div>
+                </div>
+
             </div>
           ) : (
-            <>
-                {activeTab === 'sentiment' && sentiment && (
-                    <div className="space-y-6 animate-fade-in">
-                        <div className="flex items-center space-x-4 p-3 bg-bb-dark border border-bb-border">
-                            <span className="text-xs text-bb-muted uppercase">Consensus:</span>
-                            <span className={`text-xl font-bold uppercase ${getSentimentColor(sentiment.sentiment)}`}>
-                            {sentiment.sentiment}
-                            </span>
-                        </div>
-                        
-                        <div className="bg-bb-panel border border-bb-border p-4">
-                            <h3 className="text-xs font-bold text-bb-orange mb-2 uppercase">>> DISCLOSURE SUMMARY</h3>
-                            <p className="text-bb-text text-sm leading-relaxed uppercase">{sentiment.summary}</p>
-                        </div>
-
-                        {officialSources.length > 0 && (
-                            <div className="bg-bb-black border border-bb-blue/30 p-4">
-                                <h3 className="text-[10px] font-bold text-bb-blue mb-3 uppercase tracking-tighter">>> DETECTED CORPORATE REPORTS & FILINGS</h3>
-                                <div className="space-y-2">
-                                    {officialSources.map((source, idx) => (
-                                        <a 
-                                            key={idx} 
-                                            href={source.uri} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="flex items-center text-[11px] text-bb-text hover:text-bb-blue transition-colors group"
-                                        >
-                                            <LinkIcon className="w-3 h-3 mr-2 group-hover:scale-110" />
-                                            <span className="truncate">{source.title}</span>
-                                            <span className="ml-2 text-[9px] text-bb-blue font-bold opacity-0 group-hover:opacity-100">[SOURCE]</span>
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'thesis' && (
-                    <div className="space-y-6 animate-fade-in">
-                         {technicalThesis && (
-                            <div className="flex items-center space-x-4 p-3 bg-bb-dark border border-bb-border justify-between">
-                                <div>
-                                    <span className="text-xs text-bb-muted uppercase mr-2">Tech Outlook:</span>
-                                    <span className={`text-xl font-bold uppercase ${getSentimentColor(technicalThesis.outlook)}`}>
-                                        {technicalThesis.outlook}
-                                    </span>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-xs text-bb-muted uppercase block">Confidence</span>
-                                    <span className="text-white font-bold font-mono">{technicalThesis.confidenceScore}%</span>
-                                </div>
-                            </div>
-                         )}
-
-                        {factors && (
-                            <div className="bg-bb-panel border border-bb-border p-4">
-                                <h3 className="text-xs font-bold text-bb-orange mb-3 uppercase">>> SIGNAL DNA DECONSTRUCTION</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                                    <ProgressBar label="Momentum Velocity" value={factors.momentum} colorClass="bg-blue-500" />
-                                    <ProgressBar label="Volume Conviction" value={factors.volume} colorClass="bg-orange-500" />
-                                    <ProgressBar label="Trend Persistence" value={factors.trend} colorClass="bg-purple-500" />
-                                    <ProgressBar label="Institutional Score" value={factors.institutional} colorClass="bg-bb-green" />
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-bb-border text-[10px] text-bb-muted flex justify-between">
-                                    <span>DOMINANT FACTOR: <span className="text-white font-bold">{factors.dominantFactor}</span></span>
-                                    <span>FACTOR SCORE: {Math.round((factors.momentum + factors.volume + factors.trend + factors.volatility + factors.institutional) / 5)}/100</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </>
+            <div className="text-center py-32 text-pro-muted font-black uppercase tracking-widest opacity-40 italic">Link interrupted. Re-establish terminal connection.</div>
           )}
         </div>
+
+        <footer className="bg-pro-surface border-t border-pro-border px-10 py-5 text-[10px] text-pro-muted flex justify-between items-center shrink-0">
+            <span className="uppercase font-black tracking-widest opacity-60">Protocol: Omni-Channel Alpha Reconnaissance // 2025</span>
+            <span className="text-pro-primary font-black uppercase tracking-widest">Engine: Gemini_3_Pro_Flash_Synapse</span>
+        </footer>
       </div>
     </div>
   );
 };
+
+const HighlightCard = ({ label, value, color = "text-pro-text", isSmall = false }: { label: string, value: string, color?: string, isSmall?: boolean }) => (
+    <div className="bg-pro-surface border border-pro-border p-6 rounded-3xl text-center shadow-sm hover:border-pro-primary/20 transition-all">
+        <span className="text-[9px] text-pro-muted uppercase font-black block mb-2 tracking-widest">{label}</span>
+        <span className={`font-black uppercase tracking-tight block ${isSmall ? 'text-xs' : 'text-2xl'} ${color}`}>{value}</span>
+    </div>
+);
+
+const FibRow = ({ label, value, highlighted = false }: { label: string, value: number, highlighted?: boolean }) => (
+    <div className={`flex justify-between items-center py-2 px-3 rounded-lg ${highlighted ? 'bg-pro-primary/10 border border-pro-primary/20' : 'border border-transparent'}`}>
+        <span className={`uppercase text-[9px] font-black ${highlighted ? 'text-pro-primary' : 'text-pro-muted'}`}>{label}</span>
+        <span className={`font-black ${highlighted ? 'text-pro-primary' : 'text-pro-text'}`}>₹{value.toFixed(2)}</span>
+    </div>
+);
 
 export default AnalysisModal;

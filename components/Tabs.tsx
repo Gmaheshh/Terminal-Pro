@@ -9,22 +9,22 @@ interface TabsProps {
 
 const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, setActiveTab }) => {
   return (
-    <nav className="flex overflow-x-auto custom-scrollbar" aria-label="Tabs">
-      {tabs.map((tab, index) => (
+    <nav className="flex overflow-x-auto custom-scrollbar py-1 space-x-1" aria-label="Tabs">
+      {tabs.map((tab) => (
         <button
           key={tab}
           onClick={() => setActiveTab(tab)}
           className={`
-            whitespace-nowrap py-2 px-4 font-mono text-xs uppercase tracking-wider transition-colors focus:outline-none border-r border-bb-border
+            whitespace-nowrap px-4 py-2 text-[12px] font-semibold tracking-tight rounded-xl transition-all duration-300
             ${
               activeTab === tab
-                ? 'bg-bb-orange text-bb-black font-bold'
-                : 'bg-bb-black text-bb-muted hover:text-bb-orange hover:bg-bb-panel'
+                ? 'bg-pro-primary text-white shadow-sm shadow-pro-primary/20'
+                : 'bg-transparent text-pro-muted hover:text-pro-text hover:bg-pro-bg'
             }
           `}
           aria-current={activeTab === tab ? 'page' : undefined}
         >
-          {index + 1}. {tab}
+          {tab}
         </button>
       ))}
     </nav>

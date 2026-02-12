@@ -51,7 +51,7 @@ const MiniChart: React.FC<MiniChartProps> = ({ visibleData, hiddenData, revealed
         const separatorX = lastVisiblePoint.x;
 
         const trendUp = hiddenData.length > 0 && hiddenData[hiddenData.length - 1].close >= visibleData[visibleData.length - 1].close;
-        const revealedColor = trendUp ? 'stroke-bb-green' : 'stroke-bb-red';
+        const revealedColor = trendUp ? 'stroke-pro-green' : 'stroke-pro-red';
 
         return { visiblePoints, hiddenPoints, separatorX, revealedColor };
     }, [visibleData, hiddenData, width, height]);
@@ -60,18 +60,18 @@ const MiniChart: React.FC<MiniChartProps> = ({ visibleData, hiddenData, revealed
 
     return (
         <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
-            <rect width="100%" height="100%" fill="#000000" />
-            <polyline fill="none" stroke="#ff9900" strokeWidth="2" points={chartData.visiblePoints} />
+            <rect width="100%" height="100%" fill="#f8fafc" />
+            <polyline fill="none" stroke="#2563eb" strokeWidth="3" points={chartData.visiblePoints} />
             {revealed && (
-                <polyline fill="none" className={chartData.revealedColor} strokeWidth="2" points={chartData.hiddenPoints} />
+                <polyline fill="none" className={chartData.revealedColor} strokeWidth="3" points={chartData.hiddenPoints} />
             )}
             <line
                 x1={chartData.separatorX}
                 y1="0"
                 x2={chartData.separatorX}
                 y2={height}
-                stroke="#333333"
-                strokeWidth="1"
+                stroke="#e2e8f0"
+                strokeWidth="2"
                 strokeDasharray="4 4"
             />
         </svg>
@@ -98,25 +98,15 @@ const LoadingGame: React.FC = () => {
             
             if (stockData.historical.length > 120) {
                 const totalLength = stockData.historical.length;
-                const hiddenPartLength = 20;
-                const visiblePartLength = 100;
-                const gameSegmentLength = visiblePartLength + hiddenPartLength;
+                const gameSlice = stockData.historical.slice(-120);
+                const visibleData = gameSlice.slice(0, 100);
+                const hiddenData = gameSlice.slice(100);
 
-                const segmentEndIndex = totalLength;
-                const segmentStartIndex = Math.max(0, segmentEndIndex - gameSegmentLength);
-
-                if (segmentEndIndex - segmentStartIndex === gameSegmentLength) {
-                    const gameSlice = stockData.historical.slice(segmentStartIndex, segmentEndIndex);
-                    const visibleData = gameSlice.slice(0, visiblePartLength);
-                    const hiddenData = gameSlice.slice(visiblePartLength);
-
-                    setGameData({ ticker: randomTicker, visibleData, hiddenData });
-                    setGameState('guessing');
-                    fetched = true;
-                }
+                setGameData({ ticker: randomTicker, visibleData, hiddenData });
+                setGameState('guessing');
+                fetched = true;
             }
         } catch (error) {
-            console.error("Game data fetch failed, trying another ticker.", error);
             await new Promise(resolve => setTimeout(resolve, 500));
         }
     }
@@ -124,7 +114,7 @@ const LoadingGame: React.FC = () => {
 
   useEffect(() => {
     setupNewRound();
-  }, []);
+  }, [setupNewRound]);
 
   const handleGuess = (guess: 'up' | 'down') => {
     if (gameState !== 'guessing' || !gameData) return;
@@ -147,31 +137,31 @@ const LoadingGame: React.FC = () => {
     
     setTimeout(() => {
       setupNewRound();
-    }, 3000);
+    }, 2500);
   };
   
   const renderContent = () => {
     switch(gameState) {
         case 'loading':
             return (
-                <div className="flex flex-col items-center justify-center h-64 bg-bb-black">
-                    <Loader className="w-6 h-6 text-bb-orange"/>
-                    <p className="mt-2 text-bb-muted text-xs uppercase animate-pulse">Initializing Round...</p>
+                <div className="flex flex-col items-center justify-center h-60 bg-pro-surface">
+                    <Loader className="w-8 h-8 text-pro-primary"/>
+                    <p className="mt-3 text-pro-muted text-[10px] font-bold uppercase animate-pulse">Identifying Targets...</p>
                 </div>
             );
         case 'guessing':
             return (
                 <>
-                    <div className="absolute top-2 left-4 text-bb-orange font-bold text-sm bg-bb-dark px-2">{gameData?.ticker}</div>
-                    <div className="p-1 h-64 bg-bb-black border-b border-bb-border">
+                    <div className="absolute top-3 left-4 text-pro-primary font-black text-xs bg-white px-2 py-1 rounded shadow-sm border border-pro-border">{gameData?.ticker}</div>
+                    <div className="p-1 h-60 bg-pro-surface border-b border-pro-border">
                         <MiniChart visibleData={gameData?.visibleData || []} hiddenData={gameData?.hiddenData || []} revealed={false} />
                     </div>
-                    <div className="flex justify-center space-x-1 p-2 bg-bb-dark">
-                        <button onClick={() => handleGuess('up')} className="flex-1 py-2 bg-bb-green/20 hover:bg-bb-green text-bb-green hover:text-black border border-bb-green font-bold text-sm uppercase transition-colors">
-                            [ BUY ]
+                    <div className="flex justify-center space-x-3 p-4 bg-white">
+                        <button onClick={() => handleGuess('up')} className="flex-1 py-3 bg-pro-green text-white rounded-xl font-black text-xs uppercase transition-all shadow-sm hover:brightness-110 active:scale-95">
+                            LONG
                         </button>
-                        <button onClick={() => handleGuess('down')} className="flex-1 py-2 bg-bb-red/20 hover:bg-bb-red text-bb-red hover:text-black border border-bb-red font-bold text-sm uppercase transition-colors">
-                            [ SELL ]
+                        <button onClick={() => handleGuess('down')} className="flex-1 py-3 bg-pro-red text-white rounded-xl font-black text-xs uppercase transition-all shadow-sm hover:brightness-110 active:scale-95">
+                            SHORT
                         </button>
                     </div>
                 </>
@@ -179,19 +169,19 @@ const LoadingGame: React.FC = () => {
         case 'revealed':
              return (
                 <>
-                    <div className="absolute top-2 left-4 text-bb-orange font-bold text-sm bg-bb-dark px-2">{gameData?.ticker}</div>
-                    <div className="relative p-1 h-64 bg-bb-black border-b border-bb-border">
+                    <div className="absolute top-3 left-4 text-pro-primary font-black text-xs bg-white px-2 py-1 rounded shadow-sm border border-pro-border">{gameData?.ticker}</div>
+                    <div className="relative p-1 h-60 bg-pro-surface border-b border-pro-border">
                         <MiniChart visibleData={gameData?.visibleData || []} hiddenData={gameData?.hiddenData || []} revealed={true} />
                         {result && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                                <span className={`text-2xl font-bold px-4 py-2 border-2 uppercase ${result === 'correct' ? 'border-bb-green text-bb-green bg-black' : 'border-bb-red text-bb-red bg-black'}`}>
-                                    {result === 'correct' ? '>> PROFIT <<' : '>> LOSS <<'}
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px]">
+                                <span className={`text-2xl font-black px-6 py-3 rounded-2xl shadow-heavy uppercase ${result === 'correct' ? 'text-pro-green bg-white' : 'text-pro-red bg-white'}`}>
+                                    {result === 'correct' ? 'PROFIT' : 'LOSS'}
                                 </span>
                             </div>
                         )}
                     </div>
-                    <div className="h-[58px] flex items-center justify-center bg-bb-dark">
-                        <p className="text-bb-muted text-xs uppercase animate-pulse">Loading Next Ticker...</p>
+                    <div className="h-[76px] flex items-center justify-center bg-white">
+                        <p className="text-pro-muted text-[10px] font-bold uppercase animate-pulse">Calibrating next sequence...</p>
                     </div>
                 </>
             );
@@ -199,12 +189,12 @@ const LoadingGame: React.FC = () => {
   };
 
   return (
-      <div className="bg-bb-black border border-bb-orange shadow-lg w-full font-mono">
-        <header className="px-3 py-1 bg-bb-orange text-bb-black flex justify-between items-center text-xs font-bold uppercase">
-            <h3>SIM_TRADER.EXE</h3>
-            <div className="flex space-x-4">
-                <p>PNL: <span className="text-black">{score}</span></p>
-                <p>STREAK: <span className="text-black">{streak}</span></p>
+      <div className="bg-white rounded-2xl overflow-hidden font-sans border border-pro-border">
+        <header className="px-5 py-3 bg-pro-surface text-pro-text flex justify-between items-center text-[10px] font-black uppercase border-b border-pro-border">
+            <h3 className="tracking-widest">MINI_QUANT_SIMULATOR</h3>
+            <div className="flex space-x-6">
+                <p>POINTS: <span className="text-pro-primary">{score}</span></p>
+                <p>STREAK: <span className="text-pro-primary">{streak}</span></p>
             </div>
         </header>
         <div className="relative">

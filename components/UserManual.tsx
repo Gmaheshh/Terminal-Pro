@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -27,7 +26,11 @@ const UserManual: React.FC = () => {
     return (
         <div className="p-8 max-w-5xl mx-auto font-mono h-full overflow-y-auto custom-scrollbar bg-bb-black">
             <header className="mb-12 border-b-2 border-bb-orange pb-6">
-                <h1 className="text-3xl font-bold text-white uppercase">GP Alpha <span className="text-bb-orange text-lg">by Growth Prospect Investments</span></h1>
+                <h1 className="text-3xl font-bold uppercase flex items-baseline">
+                  <span className="text-pro-red">PRA</span>
+                  <span className="text-pro-green">-GATI</span>
+                  <span className="text-bb-orange text-sm ml-4">by Growth Prospect Investments</span>
+                </h1>
                 <p className="mt-2 text-bb-muted uppercase">Quantitative Core & AI Intelligence Framework v3.1.0</p>
             </header>
 

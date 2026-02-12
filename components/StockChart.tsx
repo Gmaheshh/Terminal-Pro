@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import type { OHLCV } from '../types';
@@ -16,45 +15,44 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker }) => {
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#000000' },
-        textColor: '#ff9900', // BB Orange
+        background: { type: ColorType.Solid, color: '#ffffff' },
+        textColor: '#64748b',
       },
       grid: {
-        vertLines: { color: '#1a1a1a' },
-        horzLines: { color: '#1a1a1a' },
+        vertLines: { color: '#f1f5f9' },
+        horzLines: { color: '#f1f5f9' },
       },
       width: chartContainerRef.current.clientWidth,
       height: 300,
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-            color: '#d4d4d4',
+            color: '#cbd5e1',
             width: 1,
             style: 3,
         },
         horzLine: {
-            color: '#d4d4d4',
+            color: '#cbd5e1',
             width: 1,
             style: 3,
         },
       },
       timeScale: {
-        borderColor: '#333333',
+        borderColor: '#e2e8f0',
         timeVisible: true,
       },
       rightPriceScale: {
-        borderColor: '#333333',
+        borderColor: '#e2e8f0',
       },
     });
 
-    // Candlestick Series - High Contrast
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#000000', // Hollow body for up
-      downColor: '#ff3333', // Filled red for down
-      borderUpColor: '#00ff00', // Neon green border
-      borderDownColor: '#ff3333',
-      wickUpColor: '#00ff00',
-      wickDownColor: '#ff3333',
+      upColor: '#10b981',
+      downColor: '#ef4444',
+      borderUpColor: '#10b981',
+      borderDownColor: '#ef4444',
+      wickUpColor: '#10b981',
+      wickDownColor: '#ef4444',
     });
 
     const chartData = data.map((d) => ({
@@ -67,13 +65,12 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker }) => {
 
     candlestickSeries.setData(chartData);
 
-    // Volume Series
     const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: '#26a69a',
+      color: '#cbd5e1',
       priceFormat: {
         type: 'volume',
       },
-      priceScaleId: '', // Set as an overlay
+      priceScaleId: '', 
     });
 
     volumeSeries.priceScale().applyOptions({
@@ -86,12 +83,11 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker }) => {
     const volumeData = data.map((d) => ({
       time: d.date,
       value: d.volume,
-      color: d.close >= d.open ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 51, 51, 0.3)',
+      color: d.close >= d.open ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
     }));
 
     volumeSeries.setData(volumeData);
 
-    // Fit content
     chart.timeScale().fitContent();
 
     const handleResize = () => {
@@ -109,7 +105,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker }) => {
   }, [data]);
 
   return (
-    <div className="w-full h-full flex flex-col bg-bb-black">
+    <div className="w-full h-full flex flex-col bg-white">
       <div ref={chartContainerRef} className="w-full flex-grow" />
     </div>
   );

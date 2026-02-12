@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export const ArrowUpIcon: React.FC<{ className?: string }> = (props) => (
@@ -25,6 +24,12 @@ export const XIcon: React.FC<{ className?: string }> = (props) => (
   </svg>
 );
 
+export const InfoIcon: React.FC<{ className?: string }> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+  </svg>
+);
+
 export const BrainCircuitIcon: React.FC<{ className?: string }> = (props) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 5a3 3 0 1 0-5.993.142"/><path d="M18 5a3 3 0 1 0-5.993.142"/><path d="M12 19a3 3 0 1 0-5.993-.142"/><path d="M18 19a3 3 0 1 0-5.993-.142"/><path d="M12 12a3 3 0 1 0-5.993.142"/><path d="M18 12a3 3 0 1 0-5.993.142"/><path d="M6 5h.01"/><path d="M18 5h.01"/><path d="M6 12h.01"/><path d="M18 12h.01"/><path d="M6 19h.01"/><path d="M18 19h.01"/><path d="M9.007 5.142A3.004 3.004 0 0 0 9 6a3 3 0 1 0 6 0 3 3 0 1 0-6 0Z"/><path d="M9.007 12.142A3.004 3.004 0 0 0 9 13a3 3 0 1 0 6 0 3 3 0 1 0-6 0Z"/><path d="M9.007 19.142A3.004 3.004 0 0 0 9 20a3 3 0 1 0 6 0 3 3 0 1 0-6 0Z"/><path d="M6.01 5.01v.01"/><path d="M6.01 11.99v.01"/><path d="M6.01 18.99v.01"/><path d="M18.01 5.01v.01"/><path d="M18.01 11.99v.01"/><path d="M18.01 18.99v.01"/><path d="m9 6-1-1"/><path d="m15 6 1-1"/><path d="m9 13-1-1"/><path d="m15 13 1-1"/><path d="m9 20-1-1"/><path d="m15 20 1-1"/>
@@ -41,4 +46,16 @@ export const ListIcon: React.FC<{ className?: string }> = (props) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>
     </svg>
+);
+
+export const TrashIcon: React.FC<{ className?: string }> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>
+    </svg>
+);
+
+export const LogOutIcon: React.FC<{ className?: string }> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
 );

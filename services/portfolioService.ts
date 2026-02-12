@@ -13,7 +13,15 @@ export const calculateSharpeRatio = (returns: number[], volatility: number): num
 
 export const getPortfolioMetrics = async (selectedStocks: ProcessedStock[], allStocks: ProcessedStock[]): Promise<PortfolioMetrics> => {
     if (selectedStocks.length === 0) {
-        return { annualReturn: 0, annualVolatility: 0, sharpeRatio: 0, optimalWeights: {}, recommendations: [] };
+        // Fix: Added missing 'aiInsight' property on line 16 to satisfy PortfolioMetrics interface
+        return { 
+            annualReturn: 0, 
+            annualVolatility: 0, 
+            sharpeRatio: 0, 
+            optimalWeights: {}, 
+            recommendations: [],
+            aiInsight: "Portfolio not yet configured."
+        };
     }
 
     // 1. Calculate individual metrics for optimization
