@@ -42,13 +42,13 @@ const MacroDeepDiveModal: React.FC<MacroDeepDiveModalProps> = ({ isOpen, onClose
                             
                             {/* Summary Section */}
                             <div className="bg-bb-dark border-l-4 border-bb-blue p-5">
-                                <h3 className="text-[10px] font-bold text-bb-blue uppercase mb-2 tracking-widest">>> STRATEGIC IMPACT SUMMARY</h3>
+                                <h3 className="text-[10px] font-bold text-bb-blue uppercase mb-2 tracking-widest">{">>"} STRATEGIC IMPACT SUMMARY</h3>
                                 <p className="text-sm text-bb-text uppercase leading-relaxed font-medium italic">"{data.summary}"</p>
                             </div>
 
                             {/* Chain of Consequences */}
                             <div className="space-y-4">
-                                <h3 className="text-[10px] font-bold text-bb-orange uppercase tracking-widest">>> THE CHAIN OF CONSEQUENCES (DOTS CONNECTED)</h3>
+                                <h3 className="text-[10px] font-bold text-bb-orange uppercase tracking-widest">{">>"} THE CHAIN OF CONSEQUENCES (DOTS CONNECTED)</h3>
                                 <div className="space-y-4 relative pl-8">
                                     <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-bb-border"></div>
                                     {data.consequences.map((c, i) => (
@@ -63,7 +63,7 @@ const MacroDeepDiveModal: React.FC<MacroDeepDiveModalProps> = ({ isOpen, onClose
 
                             {/* Impacted Stocks Section */}
                             <div className="space-y-4">
-                                <h3 className="text-[10px] font-bold text-bb-green uppercase tracking-widest">>> IDENTIFIED ALPHA TARGETS (EQUITY UNIVERSE)</h3>
+                                <h3 className="text-[10px] font-bold text-bb-green uppercase tracking-widest">{">>"} IDENTIFIED ALPHA TARGETS (EQUITY UNIVERSE)</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {data.impactedStocks.map((stock, i) => (
                                         <div key={i} className="bg-bb-panel border border-bb-border p-4 hover:border-bb-blue transition-colors group">

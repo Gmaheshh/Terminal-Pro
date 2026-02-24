@@ -41,6 +41,48 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [isKiteAuthenticated, setIsKiteAuthenticated] = useState<boolean>(false);
+  const [kiteUser, setKiteUser] = useState<any>(null);
+
+  const checkKiteStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/kite/status');
+      const data = await res.json();
+      setIsKiteAuthenticated(data.isAuthenticated);
+      setKiteUser(data.user);
+    } catch (e) {
+      console.error('Failed to check Kite status', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkKiteStatus();
+  }, [checkKiteStatus]);
+
+  const handleKiteLogin = async () => {
+    try {
+      const res = await fetch('/api/auth/kite/url');
+      const { url } = await res.json();
+      const authWindow = window.open(url, 'kite_auth', 'width=600,height=700');
+      
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'KITE_AUTH_SUCCESS') {
+          checkKiteStatus();
+          window.removeEventListener('message', handleMessage);
+        }
+      };
+      window.addEventListener('message', handleMessage);
+    } catch (e) {
+      alert('Failed to initiate Kite login');
+    }
+  };
+
+  const handleKiteLogout = async () => {
+    await fetch('/api/auth/kite/logout', { method: 'POST' });
+    setIsKiteAuthenticated(false);
+    setKiteUser(null);
+  };
+
   const [loading, setLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Initializing PRA-GATI Terminal...');
   const [processedStocks, setProcessedStocks] = useState<ProcessedStock[]>([]);
@@ -294,6 +336,10 @@ const App: React.FC = () => {
         onCommandChange={handleCommandChange}
         userName={user?.name}
         onLogout={handleLogout}
+        isKiteAuthenticated={isKiteAuthenticated}
+        onKiteLogin={handleKiteLogin}
+        onKiteLogout={handleKiteLogout}
+        kiteUser={kiteUser}
       >
         <div className="h-full overflow-auto custom-scrollbar relative">
             {renderActiveComponent()}

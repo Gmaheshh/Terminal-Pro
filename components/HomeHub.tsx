@@ -213,7 +213,7 @@ const PortalCard: React.FC<{ step: string, title: string, subtitle: string, desc
             </div>
         </div>
         <div className="mt-auto pt-6 border-t border-pro-border w-full flex justify-between items-center shrink-0">
-            <span className="text-[10px] font-black text-pro-text uppercase tracking-widest group-hover:text-pro-primary transition-colors">Launch Module >></span>
+            <span className="text-[10px] font-black text-pro-text uppercase tracking-widest group-hover:text-pro-primary transition-colors">Launch Module {">>"}</span>
             <span className={`p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0 ${bg} ${color}`}>
                 <ArrowUpIcon className="w-5 h-5 rotate-90" />
             </span>

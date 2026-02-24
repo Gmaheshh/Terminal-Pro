@@ -82,8 +82,8 @@ const PortfolioMaker: React.FC<PortfolioMakerProps> = ({ stocks, marketRegime = 
         <div className="p-6 font-mono h-full overflow-y-auto bg-bb-black space-y-8">
             <header className="border-b border-bb-orange pb-4 flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-bb-orange uppercase tracking-wider">>> PORTFOLIO_FACTORY_v3.0</h2>
-                    <p className="text-bb-muted text-[10px] mt-1 uppercase">Workflow: Fundamental Screening > AI Diversification & Optimization</p>
+                    <h2 className="text-2xl font-bold text-bb-orange uppercase tracking-wider">&gt;&gt; PORTFOLIO_FACTORY_v3.0</h2>
+                    <p className="text-bb-muted text-[10px] mt-1 uppercase">Workflow: Fundamental Screening &gt; AI Diversification & Optimization</p>
                 </div>
                 <div className="flex bg-bb-panel border border-bb-border rounded overflow-hidden">
                     <button 
@@ -222,7 +222,7 @@ const PortfolioMaker: React.FC<PortfolioMakerProps> = ({ stocks, marketRegime = 
                                     disabled={selectedTickers.length === 0}
                                     className="bg-bb-orange text-bb-black font-bold px-8 py-2 text-xs uppercase hover:bg-white transition-all disabled:opacity-50"
                                 >
-                                    Proceed to Diversification >>
+                                    Proceed to Diversification {">>"}
                                 </button>
                             </div>
                         </div>

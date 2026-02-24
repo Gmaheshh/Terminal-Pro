@@ -1,5 +1,5 @@
 {
-  "name": "PRA-GATI ",
-  "description": "A comprehensive dashboard for stock market analysis, focusing on technical indicators like Golden Crossovers, EMA, Volume Trends, and more for a large number of stocks. Includes optional AI-powered sentiment analysis.",
+  "name": "PRA-GATI Terminal 1.0",
+  "description": "Institutional-grade full-stack trading terminal with real-time NSE integration via Kite Connect, quantitative backtesting, and AI-driven market intelligence.",
   "requestFramePermissions": []
 }

@@ -91,7 +91,7 @@ const StrategyBacktester: React.FC<StrategyBacktesterProps> = ({ results }) => {
     return (
         <div className="p-4 space-y-6 font-mono h-full overflow-y-auto">
             <div className="bg-bb-dark border border-bb-border p-4">
-                <h2 className="text-sm font-bold text-bb-orange uppercase tracking-wider mb-4 border-b border-bb-border pb-2">>> STRATEGY PERFORMANCE ANALYTICS</h2>
+                <h2 className="text-sm font-bold text-bb-orange uppercase tracking-wider mb-4 border-b border-bb-border pb-2">&gt;&gt; STRATEGY PERFORMANCE ANALYTICS</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Selector label="Algorithm" value={selectedStrategy} options={STRATEGIES} onChange={(e) => setSelectedStrategy(e.target.value)} />
                     <Selector label="Timeframe" value={selectedPeriod} options={PERIODS} onChange={(e) => setSelectedPeriod(e.target.value as any)} />

@@ -175,7 +175,7 @@ const MacroSentimentDashboard: React.FC = () => {
                                 {item.impactedStocks.length > 3 && <span className="text-[9px] text-pro-muted font-bold">+ {item.impactedStocks.length - 3} OTHER</span>}
                              </div>
                              <span className="text-[10px] text-pro-primary font-black opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0 uppercase">
-                                Deep Dive >>
+                                 Deep Dive {">>"}
                              </span>
                         </div>
                     </div>

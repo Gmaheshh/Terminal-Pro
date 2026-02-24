@@ -90,7 +90,7 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({
                             {strategies.map(s => (
                                 <div key={s} className="text-xl font-black text-pro-primary uppercase tracking-tight">{s}</div>
                             ))}
-                            <div className="text-[9px] font-bold text-pro-green uppercase animate-pulse">>> ACTIVE_CONVICTION</div>
+                            <div className="text-[9px] font-bold text-pro-green uppercase animate-pulse">{">>"} ACTIVE_CONVICTION</div>
                         </div>
                     ) : (
                         <div>

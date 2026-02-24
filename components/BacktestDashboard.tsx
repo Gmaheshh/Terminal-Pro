@@ -89,7 +89,7 @@ export const PortfolioSimulationDashboard: React.FC<PortfolioSimulationDashboard
     <div className="w-full font-mono">
       <div className="p-4 text-bb-text text-xs bg-bb-panel border-b border-bb-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h3 className="font-bold text-bb-orange mb-1 uppercase">>> BACKTEST PROTOCOL RESULTS</h3>
+          <h3 className="font-bold text-bb-orange mb-1 uppercase">{">>"} BACKTEST PROTOCOL RESULTS</h3>
           <p className="max-w-4xl leading-relaxed text-bb-muted">
               Executing algorithmic trading models vs. passive market benchmarks. 
               Goal: Outperform market alpha with risk-managed entries.

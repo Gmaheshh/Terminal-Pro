@@ -149,14 +149,14 @@ const BacktestDetailsModal: React.FC<BacktestDetailsModalProps> = ({ isOpen, onC
         <div className="flex flex-col lg:flex-row h-full overflow-hidden">
             {/* Chart Area */}
             <div className="lg:w-2/3 border-r border-bb-border bg-bb-black p-4 flex flex-col">
-                <div className="text-[10px] text-bb-muted mb-2 uppercase font-bold tracking-tighter">>> REAL-TIME EQUITY TRAJECTORY (POST-COSTS)</div>
+                <div className="text-[10px] text-bb-muted mb-2 uppercase font-bold tracking-tighter">{">>"} REAL-TIME EQUITY TRAJECTORY (POST-COSTS)</div>
                 <div ref={chartContainerRef} className="flex-1 w-full" />
             </div>
 
             {/* Trade Ledger / Brokerage Breakdown */}
             <div className="lg:w-1/3 flex flex-col bg-bb-dark">
                 <div className="p-4 border-b border-bb-border">
-                    <h3 className="text-xs font-bold text-bb-orange uppercase mb-3">>> COST DECONSTRUCTION</h3>
+                    <h3 className="text-xs font-bold text-bb-orange uppercase mb-3">{">>"} COST DECONSTRUCTION</h3>
                     <div className="space-y-2 text-[11px] font-mono">
                         <div className="flex justify-between">
                             <span className="text-bb-muted">EST. BROKERAGE + STT:</span>
@@ -174,7 +174,7 @@ const BacktestDetailsModal: React.FC<BacktestDetailsModalProps> = ({ isOpen, onC
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-                    <h3 className="text-xs font-bold text-bb-blue uppercase mb-3">>> RECENT TRADE LOGS</h3>
+                    <h3 className="text-xs font-bold text-bb-blue uppercase mb-3">{">>"} RECENT TRADE LOGS</h3>
                     <div className="space-y-3">
                         {result.trades.slice(-20).reverse().map((trade, idx) => (
                             <div key={idx} className="bg-bb-black border border-bb-border/50 p-2 text-[10px]">
