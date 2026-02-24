@@ -278,18 +278,15 @@ if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     
-    // Root health check for Cloud Run
-    app.get('/', (req, res, next) => {
-        const userAgent = req.headers['user-agent'] || '';
-        if (userAgent.includes('GooglePagespeed') || userAgent.includes('Google-Cloud-Run')) {
-            return res.send('PRA-GATI running');
-        }
-        next();
-    });
+    // Health check (Cloud Run friendly)
+app.get("/health", (req, res) => {
+  res.status(200).send("PRA-GATI running");
+});
 
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-    });
+   // Catch-all for SPA (serves React app)
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
+});
 } else {
     // Lazy load Vite in development
     import('vite').then(({ createServer: createViteServer }) => {
@@ -308,3 +305,4 @@ if (process.env.NODE_ENV === 'production') {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT} (NODE_ENV: ${process.env.NODE_ENV})`);
 });
+

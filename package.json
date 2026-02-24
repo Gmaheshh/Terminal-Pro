@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "start": "NODE_ENV=production node server.ts"
+    "start": "cross-env NODE_ENV=production node --import tsx server.ts"
   },
   "dependencies": {
     "@google/genai": "^1.25.0",
