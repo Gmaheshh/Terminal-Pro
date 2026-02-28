@@ -1,0 +1,16 @@
+export const STOCK_UNIVERSE = [
+  'RELIANCE.NS',
+  'TCS.NS',
+  'INFY.NS',
+  'HDFCBANK.NS',
+  'ICICIBANK.NS',
+  'SBIN.NS',
+  'ITC.NS',
+  'LT.NS',
+  'AXISBANK.NS',
+  'BHARTIARTL.NS',
+  'MARUTI.NS',
+  'TATAMOTORS.NS'
+];
+
+export const DEFAULT_TICKER = 'RELIANCE.NS';
