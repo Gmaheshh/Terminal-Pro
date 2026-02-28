@@ -1,163 +1,336 @@
-import React, { useEffect, useMemo, useState } from 'react';
-
-type Zone = 'Intelligence Hub' | 'Investing Tree' | 'Trading Desk';
-type Signal = {
-  ticker: string;
-  close: number;
-  date: string;
-  action: string;
-  indicators: { rsi14: number; ema20: number; ema50: number; macd: number; atr14: number; vwap: number };
-  executionPlan: { when: string; stopLoss: number; target: number; riskReward: number };
-};
-
-const card = 'bg-white border-2 border-slate-200 shadow-[0_20px_40px_rgba(15,23,42,0.08)] rounded-[3rem] p-6';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { fetchStockData, Tickers } from './services/stockDataService';
+import { calculateIndicators, generateSignals } from './services/technicalAnalysisService';
+import { runPortfolioSimulation } from './services/backtestingService';
+import { detectMarketRegime } from './services/marketRegimeService';
+import { generateSignalAlerts } from './services/intelligenceEngine';
+import { clearPaperState } from './services/persistenceService';
+import { getComprehensiveAnalysis } from './services/geminiService';
+import type { ProcessedStock, TabType, PortfolioBacktestResult, Column, StockData, MarketRegime, SignalAlert, DerivativeStrategy, TechnicalTrade, ComprehensiveAnalysis } from './types';
+import { CATEGORIES, CATEGORY_MAP, VOLUME_TREND_COLUMNS, PORTFOLIO_SIMULATION_COLUMNS, VWLM_COLUMNS, MainCategory } from './constants';
+import Dashboard from './components/Dashboard';
+import AnalysisModal from './components/SentimentModal';
+import { PortfolioSimulationDashboard } from './components/BacktestDashboard';
+import BacktestDetailsModal from './components/BacktestDetailsModal';
+import StockTable from './components/StockTable';
+import StrategyBacktester from './components/StrategyBacktester';
+import NewsDashboard from './components/NewsDashboard';
+import DerivativesDashboard from './components/DerivativesDashboard';
+import PayoffVisualizer from './components/PayoffVisualizer';
+import PortfolioMaker from './components/PortfolioMaker';
+import MacroSentimentDashboard from './components/MacroSentimentDashboard';
+import PositionCalculator from './components/PositionCalculator';
+import HomeHub from './components/HomeHub';
+import { Loader } from './components/Loader';
+import LoadingGame from './components/LoadingGame';
+import TickerTape from './components/TickerTape';
+import AlertFeed from './components/AlertFeed';
+import StockChart from './components/StockChart';
+import ChatBot from './components/ChatBot';
+import LoginSignup from './components/LoginSignup';
+import FAQSection from './components/FAQSection';
+import CompanyAnalysis from './components/FundamentalDashboard';
+import OIAnalyticsDashboard from './components/OIAnalyticsDashboard';
 
 const App: React.FC = () => {
-  const [zone, setZone] = useState<Zone>('Intelligence Hub');
-  const [token, setToken] = useState<string | null>(localStorage.getItem('pragati_jwt'));
-  const [ticker, setTicker] = useState('RELIANCE.NS');
-  const [history, setHistory] = useState<any[]>([]);
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [news, setNews] = useState<any[]>([]);
-  const [signals, setSignals] = useState<Signal[]>([]);
-  const [signalsToday, setSignalsToday] = useState<Signal[]>([]);
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('pragati_session') === 'active';
+  });
+  const [user, setUser] = useState<{name: string} | null>(() => {
+    const saved = localStorage.getItem('pragati_user');
+    return saved ? JSON.parse(saved) : null;
+  });
 
-  useEffect(() => {
-    fetch('/api/market/quote').then((r) => r.json()).then((d) => setQuotes(d.data ?? []));
-    fetch(`/api/market/news?ticker=${encodeURIComponent('^NSEI')}`).then((r) => r.json()).then((d) => setNews(d.items ?? []));
-  }, []);
+  const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Initializing PRA-GATI Terminal...');
+  const [processedStocks, setProcessedStocks] = useState<ProcessedStock[]>([]);
+  const [marketRegime, setMarketRegime] = useState<MarketRegime | null>(null);
+  const [errorCount, setErrorCount] = useState(0);
+  
+  const [activeCategory, setActiveCategory] = useState<MainCategory>('Home');
+  const [activeTab, setActiveTab] = useState<TabType>('Recent News');
+  const [commandValue, setCommandValue] = useState('');
+  
+  const [initialCapital, setInitialCapital] = useState<number>(1000000);
+  
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+  const [omniAnalysisData, setOmniAnalysisData] = useState<ComprehensiveAnalysis | null>(null);
+  const [modalTicker, setModalTicker] = useState<string | null>(null);
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/market/history?ticker=${encodeURIComponent(ticker)}&interval=1d&period=1y`)
-      .then((r) => r.json())
-      .then((d) => setHistory(d.candles ?? []));
-  }, [ticker]);
+  const [isBacktestModalOpen, setIsBacktestModalOpen] = useState(false);
+  const [modalBacktestData, setModalBacktestData] = useState<PortfolioBacktestResult | null>(null);
 
-  const doLogin = async () => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
-    });
+  const [executedStrategies, setExecutedStrategies] = useState<DerivativeStrategy[]>([]);
+  const [technicalTrades, setTechnicalTrades] = useState<TechnicalTrade[]>([]);
 
-    const data = await response.json();
-    if (data.token) {
-      setToken(data.token);
-      localStorage.setItem('pragati_jwt', data.token);
-    } else {
-      alert(data.error?.message ?? 'Login failed');
+  const [signalAlerts, setSignalAlerts] = useState<SignalAlert[]>([]);
+  const [isAlertsLoading, setIsAlertsLoading] = useState(false);
+  const [isAlertsVisible, setIsAlertsVisible] = useState(true);
+
+  const [hoveredStock, setHoveredStock] = useState<ProcessedStock | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const portfolioSimResults = useMemo(() => {
+    if (processedStocks.length === 0) return [];
+    return runPortfolioSimulation(processedStocks, initialCapital);
+  }, [processedStocks, initialCapital]);
+
+  const handleLogin = (userData: {name: string}) => {
+    localStorage.setItem('pragati_session', 'active');
+    localStorage.setItem('pragati_user', JSON.stringify(userData));
+    setUser(userData);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('pragati_session');
+    setIsAuthenticated(false);
+    setUser(null);
+  };
+
+  const runIntelligenceScan = async (stocks: ProcessedStock[]) => {
+      setIsAlertsLoading(true);
+      const alerts = await generateSignalAlerts(stocks);
+      setSignalAlerts(alerts);
+      setIsAlertsLoading(false);
+  };
+
+  const scanStocks = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoading(true);
+    setErrorCount(0);
+    setProcessedStocks([]);
+    
+    const stocksWithIndicators: Omit<ProcessedStock, 'signals'>[] = [];
+    const batchSize = 15; 
+    for (let i = 0; i < Tickers.length; i += batchSize) {
+        const batchTickers = Tickers.slice(i, i + batchSize);
+        setLoadingMessage(`SYNCING DATA BLOCK ${Math.ceil((i + 1) / batchSize)}/${Math.ceil(Tickers.length / batchSize)}`);
+        const fetchDataPromises = batchTickers.map(ticker => fetchStockData(ticker).catch(() => null));
+        const fetchedBatchResults = await Promise.all(fetchDataPromises);
+        for (let j = 0; j < fetchedBatchResults.length; j++) {
+            const nseData = fetchedBatchResults[j] as StockData | null;
+            if (nseData) {
+                const indicators = calculateIndicators(nseData.historical);
+                stocksWithIndicators.push({ ticker: batchTickers[j], data: nseData, indicators: indicators });
+            }
+        }
+        if (i + batchSize < Tickers.length) await new Promise(resolve => setTimeout(resolve, 50));
     }
-  };
-
-  const runUniverse = async () => {
-    if (!token) return;
-    const response = await fetch('/api/signals/universe', { headers: { Authorization: `Bearer ${token}` } });
-    const data = await response.json();
-    setSignals(data.signals ?? []);
-    setSignalsToday(data.signalsToday ?? []);
-  };
-
-  const runSingle = async () => {
-    if (!token) return;
-    const response = await fetch(`/api/signals/run?ticker=${encodeURIComponent(ticker)}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    
+    const finalProcessedStocks = stocksWithIndicators.map(stock => {
+      const signals = generateSignals(stock.indicators, stock.data.historical);
+      return { ...stock, signals: signals };
     });
-    const data = await response.json();
-    setSignals(data.signal ? [data.signal] : []);
-    setSignalsToday(data.signal?.action === 'BUY_NEXT_OPEN' ? [data.signal] : []);
+
+    const detectedRegime = detectMarketRegime(finalProcessedStocks);
+
+    setMarketRegime(detectedRegime);
+    setProcessedStocks(finalProcessedStocks);
+    setLoading(false);
+    runIntelligenceScan(finalProcessedStocks);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+        scanStocks();
+    }
+  }, [isAuthenticated, scanStocks]);
+
+  const handleOmniAnalysis = useCallback(async (ticker: string) => {
+    setModalTicker(ticker);
+    setIsAnalysisModalOpen(true);
+    setOmniAnalysisData(null);
+    setIsAnalysisLoading(true);
+    const stock = processedStocks.find(s => s.ticker === ticker);
+    if (!stock) { setIsAnalysisLoading(false); return; }
+    try {
+        const result = await getComprehensiveAnalysis(stock);
+        setOmniAnalysisData(result);
+    } catch (error: any) {
+      console.error("Omni Analysis Failed", error);
+    } finally {
+      setIsAnalysisLoading(false);
+    }
+  }, [processedStocks]);
+
+  const handleExecuteTechnicalTrade = (stock: ProcessedStock) => {
+      const isVWLM = stock.signals.vwlmBuySignal || stock.signals.vwlmSellSignal;
+      const direction = (stock.signals.vwlmSellSignal || stock.signals.trendSignal === 'Downtrend') ? 'SHORT' : 'LONG';
+      const trade: TechnicalTrade = {
+          ticker: stock.ticker,
+          entryPrice: stock.data.currentPrice,
+          currentPrice: stock.data.currentPrice,
+          stopLoss: isVWLM ? (stock.signals.vwlmStopLoss || 0) : stock.signals.stopLoss,
+          target: isVWLM ? (stock.signals.vwlmTarget || 0) : stock.signals.target,
+          timestamp: new Date().toLocaleTimeString(),
+          direction: direction as 'LONG' | 'SHORT',
+          historical: stock.data.historical
+      };
+      if (!technicalTrades.some(t => t.ticker === trade.ticker)) {
+        setTechnicalTrades(prev => [trade, ...prev]);
+        setActiveCategory('Trading Tree');
+        setActiveTab('Payoff Visualizer');
+      }
   };
 
-  const regime = useMemo(() => {
-    const advancers = quotes.filter((q) => (q.regularMarketChangePercent ?? 0) > 0).length;
-    const decliners = quotes.length - advancers;
-    return advancers >= decliners ? 'Risk-On' : 'Risk-Off';
-  }, [quotes]);
+  const handleCommandChange = (val: string) => {
+      setCommandValue(val);
+      const upperVal = val.toUpperCase();
+      if (upperVal === 'RESET') {
+          if (confirm("SYSTEM WARNING: IRREVERSIBLE DATA PURGE REQUESTED?")) clearPaperState();
+          setCommandValue('');
+          return;
+      }
+      if (upperVal === 'NEWS') { setActiveCategory('Intelligence Hub'); setActiveTab('Recent News'); }
+      else if (upperVal === 'SIM') { setActiveCategory('Trading Tree'); setActiveTab('Backtest Simulation'); }
+      else if (upperVal === 'LOGOUT') handleLogout();
+  };
 
-  const exportCsv = () => {
-    const rows = signals.map((s) => `${s.ticker},${s.close},${s.action},${s.indicators.rsi14.toFixed(2)},${s.executionPlan.stopLoss.toFixed(2)},${s.executionPlan.target.toFixed(2)}`);
-    const blob = new Blob([`Ticker,Close,Action,RSI,StopLoss,Target\n${rows.join('\n')}`], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'pragati-signals.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleTableHover = (stock: ProcessedStock | null, x: number, y: number) => {
+      setHoveredStock(stock);
+      setMousePos({ x, y });
+  };
+
+  const filteredData = useMemo(() => {
+    let data = processedStocks;
+    if (activeTab === 'Volume/Trend') data = processedStocks.filter(s => s.signals.volumeSignal === 'Spike');
+    else if (activeTab === 'VWLM') data = processedStocks.filter(s => s.signals.vwlmBuySignal || s.signals.vwlmSellSignal);
+    if (commandValue.length > 0) {
+        const search = commandValue.toUpperCase();
+        data = data.filter(s => s.ticker.includes(search));
+    }
+    return data;
+  }, [processedStocks, activeTab, commandValue]);
+
+  const columns = useMemo(() => {
+    switch(activeTab) {
+      case 'Volume/Trend': return VOLUME_TREND_COLUMNS(handleOmniAnalysis, handleExecuteTechnicalTrade);
+      case 'VWLM': return VWLM_COLUMNS(handleOmniAnalysis, handleExecuteTechnicalTrade);
+      case 'Backtest Simulation': return PORTFOLIO_SIMULATION_COLUMNS((res) => { setModalBacktestData(res); setIsBacktestModalOpen(true); });
+      default: return [];
+    }
+  }, [activeTab, handleOmniAnalysis, handleExecuteTechnicalTrade]);
+
+  if (!isAuthenticated) {
+    return <LoginSignup onLogin={handleLogin} />;
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-pro-bg text-pro-text font-sans">
+        <Loader className="w-12 h-12 text-pro-primary" />
+        <p className="text-sm mt-6 font-bold tracking-widest text-pro-primary uppercase animate-pulse">{loadingMessage}</p>
+        <div className="mt-12 w-full max-w-xl border border-pro-border bg-pro-card rounded-2xl shadow-soft p-1 overflow-hidden">
+          <LoadingGame />
+        </div>
+      </div>
+    );
+  }
+
+  const renderActiveComponent = () => {
+      if (activeCategory === 'Home') return <HomeHub stocks={processedStocks} onNavigate={(cat, tab) => { setActiveCategory(cat); setActiveTab(tab); }} onAnalyze={handleOmniAnalysis} />;
+      
+      switch(activeTab) {
+          case 'Backtest Simulation':
+              return (
+                <PortfolioSimulationDashboard 
+                  columns={columns as Column<PortfolioBacktestResult>[]} 
+                  data={portfolioSimResults}
+                  capital={initialCapital}
+                  onCapitalChange={setInitialCapital}
+                />
+              );
+          case 'Strategy Backtester': return <StrategyBacktester results={portfolioSimResults} />;
+          case 'Portfolio Maker': return <PortfolioMaker stocks={processedStocks} marketRegime={marketRegime?.type} />;
+          case 'Position Calculator': return <PositionCalculator stocks={processedStocks} defaultAccountSize={initialCapital} />;
+          case 'Macro Analysis': return <MacroSentimentDashboard />;
+          case 'Company Analysis': return <CompanyAnalysis stocks={processedStocks} />;
+          case 'OI Analytics': return <OIAnalyticsDashboard stocks={processedStocks} />;
+          case 'Payoff Visualizer': 
+              return (
+                  <PayoffVisualizer 
+                      strategies={executedStrategies} 
+                      onCloseStrategy={(i) => setExecutedStrategies(prev => prev.filter((_, idx) => idx !== i))} 
+                      technicalTrades={technicalTrades}
+                      onCloseTechnical={(i) => setTechnicalTrades(prev => prev.filter((_, idx) => idx !== i))}
+                  />
+              );
+          case 'User Manual': return <FAQSection />;
+          case 'Recent News': return <NewsDashboard processedStocks={processedStocks} />;
+          case 'Derivatives Desk': return <DerivativesDashboard stocks={processedStocks} onExecute={(strat) => setExecutedStrategies(prev => [...prev, strat])} onHover={handleTableHover} />;
+          
+          default:
+              return (
+                <StockTable 
+                  columns={columns as Column<ProcessedStock>[]} 
+                  data={filteredData} 
+                  activeTab={activeTab} 
+                  onHover={handleTableHover}
+                />
+              );
+      }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 font-sans">
-      <header className={`${card} mb-4`}>
-        <div className="flex flex-wrap justify-between items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight"><span className="text-red-500">PRA</span><span className="text-green-600">-GATI</span> Terminal</h1>
-          <div className="text-sm font-medium">Market Regime: <span className="text-indigo-600">{regime}</span> | Watchlist: {quotes.length}</div>
-        </div>
-        <div className="grid md:grid-cols-4 gap-3 mt-4">
-          {quotes.slice(0, 4).map((q: any) => <div key={q.symbol} className="rounded-2xl border border-slate-200 p-3"><div className="font-semibold">{q.symbol}</div><div className="font-mono">{q.regularMarketPrice}</div></div>)}
-        </div>
-      </header>
-
-      <nav className={`${card} mb-4 flex gap-2 overflow-auto`}>
-        {(['Intelligence Hub', 'Investing Tree', 'Trading Desk'] as Zone[]).map((z) => (
-          <button key={z} onClick={() => setZone(z)} className={`px-5 py-2 rounded-full border ${zone === z ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-slate-300'}`}>{z}</button>
-        ))}
-      </nav>
-
-      <main className={card}>
-        {zone === 'Intelligence Hub' && (
-          <div className="grid lg:grid-cols-2 gap-4">
-            <section>
-              <h2 className="text-xl font-semibold mb-3">Recent News</h2>
-              <ul className="space-y-2">
-                {news.map((n: any, idx) => <li key={idx} className="border rounded-2xl p-3"><a className="text-indigo-700 hover:underline" href={n.link} target="_blank">{n.title}</a><div className="text-xs text-slate-500">{n.publisher}</div></li>)}
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-xl font-semibold mb-3">Macro Matrix</h2>
-              <table className="w-full text-sm"><thead><tr className="text-left border-b"><th>Symbol</th><th>Price</th><th>Change %</th></tr></thead><tbody>{quotes.map((q: any) => <tr key={q.symbol} className="border-b"><td>{q.symbol}</td><td className="font-mono">{q.regularMarketPrice}</td><td>{Number(q.regularMarketChangePercent ?? 0).toFixed(2)}%</td></tr>)}</tbody></table>
-            </section>
-          </div>
-        )}
-
-        {zone === 'Investing Tree' && (
-          <div>
-            <h2 className="text-xl font-semibold mb-3">Company Analysis</h2>
-            <div className="flex gap-2 mb-3">
-              <input className="border rounded-xl px-3 py-2" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} />
-            </div>
-            <div className="grid lg:grid-cols-2 gap-4">
-              <div className="border rounded-2xl p-3"><div className="text-sm text-slate-500 mb-2">Price trend (latest 15 days)</div>{history.slice(-15).map((c: any) => <div key={c.date} className="flex justify-between text-sm"><span>{c.date}</span><span className="font-mono">{c.close?.toFixed(2)}</span></div>)}</div>
-              <div className="border rounded-2xl p-3"><div className="font-semibold mb-2">Key Stats (placeholder)</div><div className="text-sm">P/E: --</div><div className="text-sm">ROE: --</div><div className="text-sm">Debt/Equity: --</div><div className="text-sm mt-3 font-semibold">Financial Table</div><div className="text-sm text-slate-500">Revenue, EBITDA, PAT placeholders</div></div>
-            </div>
-          </div>
-        )}
-
-        {zone === 'Trading Desk' && (
-          <div>
-            {!token ? (
-              <div className="max-w-md border rounded-3xl p-4">
-                <h2 className="font-semibold text-lg mb-2">Login Required</h2>
-                <input placeholder="Username" className="w-full border rounded-xl px-3 py-2 mb-2" onChange={(e) => setCredentials((s) => ({ ...s, username: e.target.value }))} />
-                <input placeholder="Password" type="password" className="w-full border rounded-xl px-3 py-2 mb-2" onChange={(e) => setCredentials((s) => ({ ...s, password: e.target.value }))} />
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl" onClick={doLogin}>Login</button>
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <input className="border rounded-xl px-3 py-2" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} />
-                  <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl" onClick={runSingle}>Run Signal</button>
-                  <button className="bg-slate-900 text-white px-4 py-2 rounded-xl" onClick={runUniverse}>Scan Universe</button>
-                  <button className="border border-slate-300 px-4 py-2 rounded-xl" onClick={exportCsv}>Export CSV</button>
+    <div className="h-screen bg-pro-bg text-pro-text flex flex-col overflow-hidden font-sans animate-fade-in selection:bg-pro-primary/10">
+      <Dashboard
+        activeCategory={activeCategory}
+        setActiveCategory={(cat) => {
+            setActiveCategory(cat);
+            if (CATEGORY_MAP[cat].length > 0) {
+                setActiveTab(CATEGORY_MAP[cat][0]);
+            }
+        }}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        totalScanned={Tickers.length}
+        errors={errorCount}
+        onRefresh={scanStocks}
+        stocks={processedStocks}
+        regime={marketRegime}
+        commandValue={commandValue}
+        onCommandChange={handleCommandChange}
+        userName={user?.name}
+        onLogout={handleLogout}
+      >
+        <div className="h-full overflow-auto custom-scrollbar relative">
+            {renderActiveComponent()}
+            {hoveredStock && activeCategory !== 'Home' && (
+                <div className="fixed z-[999] pointer-events-none transition-opacity duration-200" style={{ left: `${mousePos.x + 20}px`, top: `${mousePos.y - 150}px` }}>
+                    <div className="bg-pro-card border border-pro-border shadow-heavy w-[320px] rounded-xl overflow-hidden ring-4 ring-white/50">
+                        <div className="bg-pro-primary text-white px-3 py-1.5 text-[11px] font-bold flex justify-between uppercase">
+                            <span>{hoveredStock.ticker}</span>
+                            <span>{hoveredStock.data.currentPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="h-44 w-full bg-white">
+                             <StockChart data={hoveredStock.data.historical.slice(-60)} ticker={hoveredStock.ticker} />
+                        </div>
+                    </div>
                 </div>
-                <h3 className="font-semibold mb-2">Signals Today</h3>
-                <table className="w-full text-sm mb-4"><thead><tr className="text-left border-b"><th>Ticker</th><th>Action</th><th>RSI</th><th>ATR</th></tr></thead><tbody>{signalsToday.map((s) => <tr key={s.ticker} className="border-b"><td>{s.ticker}</td><td>{s.action}</td><td className="font-mono">{s.indicators.rsi14.toFixed(2)}</td><td className="font-mono">{s.indicators.atr14.toFixed(2)}</td></tr>)}</tbody></table>
-                <h3 className="font-semibold mb-2">Execute Next Open Plan</h3>
-                <table className="w-full text-sm"><thead><tr className="text-left border-b"><th>Ticker</th><th>Stop</th><th>Target</th><th>R:R</th></tr></thead><tbody>{signals.map((s) => <tr key={`${s.ticker}-plan`} className="border-b"><td>{s.ticker}</td><td className="font-mono">{s.executionPlan.stopLoss.toFixed(2)}</td><td className="font-mono">{s.executionPlan.target.toFixed(2)}</td><td className="font-mono">{s.executionPlan.riskReward}</td></tr>)}</tbody></table>
-              </>
             )}
-          </div>
-        )}
-      </main>
+        </div>
+      </Dashboard>
+      
+      <TickerTape stocks={processedStocks} />
+      {isAlertsVisible && <AlertFeed alerts={signalAlerts} loading={isAlertsLoading} onRefresh={() => runIntelligenceScan(processedStocks)} onClose={() => setIsAlertsVisible(false)} />}
+
+      <AnalysisModal
+        isOpen={isAnalysisModalOpen}
+        onClose={() => setIsAnalysisModalOpen(false)}
+        ticker={modalTicker}
+        data={omniAnalysisData}
+        isLoading={isAnalysisLoading}
+        stock={processedStocks.find(s => s.ticker === modalTicker)}
+      />
+      
+      <BacktestDetailsModal 
+        isOpen={isBacktestModalOpen}
+        onClose={() => setIsBacktestModalOpen(false)}
+        result={modalBacktestData}
+      />
+      <ChatBot />
     </div>
   );
 };

@@ -102,39 +102,7 @@ export const fetchStockData = async (ticker: string): Promise<StockData> => {
     return cache.get(ticker)!;
   }
 
-  // 1. Try Kite first
-  try {
-    const from = new Date();
-    from.setFullYear(from.getFullYear() - 2);
-    const to = new Date();
-    
-    const kiteRes = await fetch(`/api/kite/historical?ticker=${encodeURIComponent(ticker)}&interval=day&from=${from.toISOString().split('T')[0]}&to=${to.toISOString().split('T')[0]}`);
-    
-    if (kiteRes.ok) {
-      const kiteData = await kiteRes.json();
-      if (Array.isArray(kiteData) && kiteData.length > 0) {
-        const historical: OHLCV[] = kiteData.map((d: any) => ({
-          date: new Date(d.date).toISOString().split('T')[0],
-          open: d.open,
-          high: d.high,
-          low: d.low,
-          close: d.close,
-          volume: d.volume,
-          openInterest: d.oi || 0
-        }));
-
-        const currentPrice = historical[historical.length - 1].close;
-        const fundamentals = await fetchFundamentals(ticker);
-        const stockData: StockData = { ticker, currentPrice, historical, fundamentals };
-        cache.set(ticker, stockData);
-        return stockData;
-      }
-    }
-  } catch (e) {
-    console.warn('Kite fetch failed, falling back to Yahoo API', e);
-  }
-
-  // 2. Fallback to Yahoo via Backend Proxy
+  // Fallback to Yahoo via Backend Proxy
   try {
     const response = await fetch(`/api/market/historical?ticker=${encodeURIComponent(ticker)}&range=2y&interval=1d`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

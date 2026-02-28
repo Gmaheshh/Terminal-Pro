@@ -8,8 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "start": "cross-env NODE_ENV=production node --import tsx server.ts",
-    "test": "cross-env NODE_ENV=test node --import tsx --test tests/api.test.ts"
+    "start": "NODE_ENV=production node server.ts"
   },
   "dependencies": {
     "@google/genai": "^1.25.0",
@@ -20,7 +19,6 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "kiteconnect": "^5.1.0",
     "lightweight-charts": "5.0.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

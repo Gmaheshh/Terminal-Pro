@@ -20,10 +20,6 @@ interface DashboardProps {
   onCommandChange: (val: string) => void;
   userName?: string;
   onLogout: () => void;
-  isKiteAuthenticated?: boolean;
-  onKiteLogin?: () => void;
-  onKiteLogout?: () => void;
-  kiteUser?: any;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -40,11 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   commandValue,
   onCommandChange,
   userName,
-  onLogout,
-  isKiteAuthenticated,
-  onKiteLogin,
-  onKiteLogout,
-  kiteUser
+  onLogout
 }) => {
   const [time, setTime] = useState(new Date());
 
@@ -96,25 +88,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
             
             <div className="flex items-center space-x-3 pl-6 border-l border-pro-border/60">
-              {/* Zerodha Kite Integration Button */}
-              {isKiteAuthenticated ? (
-                <div className="flex items-center space-x-2 bg-pro-green/10 px-3 py-1.5 rounded-xl border border-pro-green/20">
-                  <div className="w-2 h-2 bg-pro-green rounded-full animate-pulse"></div>
-                  <span className="text-[10px] font-bold text-pro-green uppercase tracking-wider">Kite: {kiteUser?.user_name || 'Connected'}</span>
-                  <button onClick={onKiteLogout} className="ml-2 text-pro-muted hover:text-pro-red transition-colors">
-                    <LogOutIcon className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <button 
-                  onClick={onKiteLogin}
-                  className="flex items-center space-x-2 bg-[#ff5722] hover:bg-[#e64a19] text-white px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95"
-                >
-                  <img src="https://kite.zerodha.com/static/images/kite-logo.svg" className="w-3 h-3 invert" alt="" />
-                  <span>Connect Kite</span>
-                </button>
-              )}
-
               <button onClick={onRefresh} className="p-2 text-pro-muted hover:text-pro-primary hover:bg-pro-primary/5 rounded-xl transition-all" title="Refresh Matrix">
                 <RefreshCwIcon className="w-4 h-4" />
               </button>

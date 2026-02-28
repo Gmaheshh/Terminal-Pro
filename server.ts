@@ -1,122 +1,162 @@
 import express from 'express';
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { STOCK_UNIVERSE, DEFAULT_TICKER } from './backend/config/universe';
-import { rateLimit } from './backend/middleware/rateLimit';
-import { parseNumber, validateTicker } from './backend/middleware/validation';
-import { issueToken, requireAuth } from './backend/middleware/auth';
-import { errorHandler, notFound, asyncHandler, ApiError } from './backend/utils/http';
-import { fetchHistory, fetchNews, fetchQuote } from './backend/services/marketDataService';
-import { buildSignal } from './backend/services/signalService';
+import axios from 'axios';
 
 dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 8080;
 
+// Trust proxy for Cloud Run/Nginx
 app.set('trust proxy', 1);
-app.use(cors());
-app.use(express.json());
-app.use(rateLimit(150, 60_000));
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', app: 'PRA-GATI Terminal' });
+// Middleware
+app.use(express.json());
+app.use(cookieParser());
+app.use(cors());
+app.use(session({
+    secret: 'pragati-secret-key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        httpOnly: true
+    }
+}));
+
+// --- API ROUTES ---
+
+// 0. Health Checks
+app.get('/api/health', (req, res) => res.send('PRA-GATI running'));
+app.get('/healthz', (req, res) => res.send('OK'));
+
+// --- GENERIC MARKET DATA PROXIES ---
+
+const USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15'
+];
+
+async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<any> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+            const response = await axios.get(url, {
+                headers: { 'User-Agent': userAgent },
+                timeout: 10000
+            });
+            return response;
+        } catch (error: any) {
+            if (error.response && error.response.status === 429 && i < retries - 1) {
+                console.warn(`Rate limited (429) for ${url}. Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
+// 8. Yahoo Finance Fundamentals Proxy
+app.get('/api/market/fundamentals', async (req, res) => {
+    const { ticker } = req.query;
+    if (!ticker) return res.status(400).json({ error: 'Ticker required' });
+
+    const modules = "financialData,defaultKeyStatistics,assetProfile,incomeStatementHistory,balanceSheetHistory,cashflowStatementHistory,summaryDetail";
+    const url = `https://query1.finance.yahoo.com/v11/finance/quoteSummary/${encodeURIComponent(ticker as string)}?modules=${modules}`;
+
+    try {
+        const response = await fetchWithRetry(url);
+        res.json(response.data);
+    } catch (error: any) {
+        console.error('Yahoo Fundamentals Error:', error.message);
+        res.status(error.response?.status || 500).json({ error: 'Failed to fetch fundamentals' });
+    }
 });
 
-app.post('/api/auth/login', asyncHandler(async (req, res) => {
-  const { username, password } = req.body as { username?: string; password?: string };
-  const adminUser = process.env.ADMIN_USER;
-  const adminPass = process.env.ADMIN_PASS;
+// 9. Yahoo Finance Historical Proxy
+app.get('/api/market/historical', async (req, res) => {
+    const { ticker, range, interval } = req.query;
+    if (!ticker) return res.status(400).json({ error: 'Ticker required' });
 
-  if (!adminUser || !adminPass) {
-    throw new ApiError(500, 'ADMIN_USER / ADMIN_PASS are not configured', 'CONFIG_ERROR');
-  }
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker as string)}?range=${range || '2y'}&interval=${interval || '1d'}`;
 
-  if (username !== adminUser || password !== adminPass) {
-    throw new ApiError(401, 'Invalid credentials', 'UNAUTHORIZED');
-  }
+    try {
+        const response = await fetchWithRetry(url);
+        res.json(response.data);
+    } catch (error: any) {
+        console.error('Yahoo Historical Error:', error.message);
+        res.status(error.response?.status || 500).json({ error: 'Failed to fetch historical data' });
+    }
+});
 
-  const token = issueToken(username);
-  res.json({ token, user: { username } });
-}));
+// 10. NSE Option Chain Proxy
+app.get('/api/market/option-chain', async (req, res) => {
+    const { symbol, isIndex } = req.query;
+    if (!symbol) return res.status(400).json({ error: 'Symbol required' });
 
-app.get('/api/market/history', asyncHandler(async (req, res) => {
-  const ticker = (req.query.ticker as string) || DEFAULT_TICKER;
-  const interval = (req.query.interval as string) || '1d';
-  const period = (req.query.period as string) || '1y';
-  validateTicker(ticker);
+    const baseUrl = isIndex === 'true' 
+        ? `https://www.nseindia.com/api/option-chain-indices?symbol=${symbol}`
+        : `https://www.nseindia.com/api/option-chain-equities?symbol=${symbol}`;
 
-  const candles = await fetchHistory(ticker, interval, period);
-  res.json({ ticker, interval, period, candles });
-}));
+    try {
+        // NSE requires a cookie-handshake often. We'll try a direct fetch first.
+        const response = await axios.get(baseUrl, {
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://www.nseindia.com/option-chain',
+            },
+            timeout: 10000
+        });
+        res.json(response.data);
+    } catch (error: any) {
+        console.error('NSE Option Chain Error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch option chain from NSE' });
+    }
+});
 
-app.get('/api/market/news', asyncHandler(async (req, res) => {
-  const ticker = (req.query.ticker as string) || '^NSEI';
-  validateTicker(ticker);
-  const items = await fetchNews(ticker);
-  res.json({ ticker, items });
-}));
-
-app.get('/api/market/quote', asyncHandler(async (req, res) => {
-  const symbols = ((req.query.symbols as string) || '^NSEI,^NSEBANK,RELIANCE.NS,TCS.NS').split(',');
-  const clean = symbols.map((s) => s.trim().toUpperCase()).filter(Boolean);
-  clean.forEach(validateTicker);
-  const data = await fetchQuote(clean);
-  res.json({ symbols: clean, data });
-}));
-
-app.get('/api/signals/run', requireAuth, asyncHandler(async (req, res) => {
-  const ticker = (req.query.ticker as string) || DEFAULT_TICKER;
-  const period = (req.query.period as string) || '6mo';
-  validateTicker(ticker);
-
-  const candles = await fetchHistory(ticker, '1d', period);
-  const signal = buildSignal(ticker, candles);
-  res.json({ signal });
-}));
-
-app.get('/api/signals/universe', requireAuth, asyncHandler(async (req, res) => {
-  const max = parseNumber(req.query.max as string, STOCK_UNIVERSE.length);
-  const universe = STOCK_UNIVERSE.slice(0, Math.max(1, max));
-
-  const signals = await Promise.all(
-    universe.map(async (ticker) => {
-      const candles = await fetchHistory(ticker, '1d', '6mo');
-      return buildSignal(ticker, candles);
-    })
-  );
-
-  const signalsToday = signals.filter((s) => s.action === 'BUY_NEXT_OPEN');
-  res.json({ universe, generatedAt: new Date().toISOString(), signals, signalsToday });
-}));
-
+// --- VITE / STATIC SERVING ---
 if (process.env.NODE_ENV === 'production') {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const distPath = path.join(__dirname, 'dist');
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    
+    // Root health check for Cloud Run
+    app.get('/', (req, res, next) => {
+        const userAgent = req.headers['user-agent'] || '';
+        if (userAgent.includes('GooglePagespeed') || userAgent.includes('Google-Cloud-Run')) {
+            return res.send('PRA-GATI running');
+        }
+        next();
+    });
 
-  app.use(express.static(distPath));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-} else if (process.env.NODE_ENV !== 'test') {
-  const { createServer } = await import('vite');
-  const vite = await createServer({
-    server: { middlewareMode: true },
-    appType: 'spa'
-  });
-  app.use(vite.middlewares);
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+} else {
+    // Lazy load Vite in development
+    import('vite').then(({ createServer: createViteServer }) => {
+        createViteServer({
+            server: { middlewareMode: true },
+            appType: 'spa',
+        }).then(vite => {
+            app.use(vite.middlewares);
+            console.log('Vite dev middleware loaded');
+        });
+    }).catch(err => {
+        console.error('Failed to load Vite:', err);
+    });
 }
 
-app.use(notFound);
-app.use(errorHandler);
-
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`PRA-GATI Terminal running on ${PORT}`);
-  });
-}
-
-export default app;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT} (NODE_ENV: ${process.env.NODE_ENV})`);
+});
