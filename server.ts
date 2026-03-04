@@ -48,13 +48,16 @@ const USER_AGENTS = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15'
 ];
 
-async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<any> {
+async function fetchWithRetry(url: string, retries = 3, delay = 2000): Promise<any> {
     for (let i = 0; i < retries; i++) {
         try {
             const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
             const response = await axios.get(url, {
-                headers: { 'User-Agent': userAgent },
-                timeout: 10000
+                headers: { 
+                    'User-Agent': userAgent,
+                    'Accept': 'application/json'
+                },
+                timeout: 15000
             });
             return response;
         } catch (error: any) {
@@ -62,6 +65,9 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<a
                 console.warn(`Rate limited (429) for ${url}. Retrying in ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 delay *= 2; // Exponential backoff
+            } else if (i < retries - 1) {
+                console.warn(`Request failed for ${url}. Retrying in ${delay/2}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay/2));
             } else {
                 throw error;
             }

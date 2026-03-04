@@ -103,7 +103,7 @@ const App: React.FC = () => {
     setProcessedStocks([]);
     
     const stocksWithIndicators: Omit<ProcessedStock, 'signals'>[] = [];
-    const batchSize = 15; 
+    const batchSize = 5; // Reduced from 15 to avoid rate limiting
     for (let i = 0; i < Tickers.length; i += batchSize) {
         const batchTickers = Tickers.slice(i, i + batchSize);
         setLoadingMessage(`SYNCING DATA BLOCK ${Math.ceil((i + 1) / batchSize)}/${Math.ceil(Tickers.length / batchSize)}`);
@@ -116,7 +116,8 @@ const App: React.FC = () => {
                 stocksWithIndicators.push({ ticker: batchTickers[j], data: nseData, indicators: indicators });
             }
         }
-        if (i + batchSize < Tickers.length) await new Promise(resolve => setTimeout(resolve, 50));
+        // Increased delay to avoid rate limiting
+        if (i + batchSize < Tickers.length) await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     const finalProcessedStocks = stocksWithIndicators.map(stock => {
