@@ -6,9 +6,11 @@ class ZerodhaService {
   private accessToken: string | null = null;
 
   constructor() {
-    this.kite = new KiteConnect({
-      api_key: process.env.KITE_API_KEY || ''
-    });
+    const apiKey = process.env.KITE_API_KEY || '';
+    if (!apiKey) {
+      console.error('KITE_API_KEY not found in environment');
+    }
+    this.kite = new KiteConnect({ api_key: apiKey });
 
     // Load access token from environment if available
     const token = process.env.KITE_ACCESS_TOKEN;

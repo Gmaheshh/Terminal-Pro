@@ -5,9 +5,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import axios from 'axios';
-import zerodhaService from './services/zerodhaService';
 
-dotenv.config();
+// Load environment variables BEFORE importing services
+dotenv.config({ path: '.env.local' });
+
+import zerodhaService from './services/zerodhaService';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
