@@ -61,7 +61,7 @@ export async function getArbitrageStrategy(
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
+            model: "gemini-2.5-pro",
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
@@ -115,7 +115,7 @@ export async function scanStrategyForStocks(
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
+            model: "gemini-2.5-pro",
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
@@ -137,7 +137,7 @@ export async function getComprehensiveAnalysis(stock: ProcessedStock): Promise<C
     const ai = getAiClient();
     const prompt = `Perform an institutional Omni-Analysis for the Indian stock: ${stock.ticker}.`;
     const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
+        model: "gemini-2.5-pro",
         contents: prompt,
         config: { tools: [{ googleSearch: {} }] }
     });
@@ -148,7 +148,7 @@ export async function getMacroDeepDive(event: string, label: string): Promise<Ma
     const ai = getAiClient();
     const prompt = `Analyze: "${label}: ${event}".`;
     const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
+        model: "gemini-2.5-pro",
         contents: prompt,
         config: { tools: [{ googleSearch: {} }] }
     });
@@ -158,7 +158,7 @@ export async function getMacroDeepDive(event: string, label: string): Promise<Ma
 export async function suggestFundamentalFilters(marketRegime: string): Promise<FundamentalFilters> {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Suggest filters for regime: ${marketRegime}`,
         config: { responseMimeType: "application/json" }
     });
@@ -168,7 +168,7 @@ export async function suggestFundamentalFilters(marketRegime: string): Promise<F
 export async function getSentiment(ticker: string): Promise<Sentiment> {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Sentiment scan for ${ticker}`,
         config: { tools: [{ googleSearch: {} }] }
     });
@@ -196,7 +196,7 @@ export async function* getMacroSentimentStream() {
     Use real-time news grounding via Google Search to be accurate.`;
 
     const stream = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: "Execute full sectoral macro intelligence report for Indian and Global markets.",
         config: { 
             tools: [{ googleSearch: {} }],
