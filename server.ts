@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import axios from 'axios';
+import zerodhaService from './services/zerodhaService';
 
 dotenv.config();
 
@@ -33,6 +34,38 @@ app.use(session({
 }));
 
 // --- API ROUTES ---
+
+// Zerodha Kite Connect Authentication
+app.get('/api/zerodha/login', (req, res) => {
+    const loginUrl = zerodhaService.getLoginUrl();
+    res.json({ loginUrl });
+});
+
+app.get('/api/zerodha/callback', async (req, res) => {
+    const requestToken = req.query.request_token as string;
+    
+    if (!requestToken) {
+        return res.status(400).json({ error: 'Missing request_token' });
+    }
+    
+    try {
+        const sessionData = await zerodhaService.generateSession(requestToken);
+        req.session.kiteAccessToken = sessionData.access_token;
+        req.session.kiteUserId = sessionData.user_id;
+        
+        res.redirect('/?kite_auth=success');
+    } catch (error: any) {
+        console.error('Zerodha auth error:', error);
+        res.redirect('/?kite_auth=error');
+    }
+});
+
+app.get('/api/zerodha/status', (req, res) => {
+    res.json({
+        authenticated: zerodhaService.isAuthenticated(),
+        userId: req.session.kiteUserId || null
+    });
+});
 
 // 0. Health Checks
 app.get('/api/health', (req, res) => res.send('PRA-GATI running'));

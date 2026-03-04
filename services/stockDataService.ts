@@ -5,7 +5,8 @@ import { generateMockStockData } from './mockDataService';
 export { Tickers };
 
 const cache = new Map<string, StockData>();
-const USE_MOCK_DATA = true; // Set to true when Yahoo Finance is rate-limiting
+const USE_ZERODHA = false; // Will be enabled after user authenticates
+const USE_MOCK_DATA = true; // Fallback to mock if Zerodha not available
 
 const generateMockHistory = (base: number, yearsCount: number = 3): number[] => {
     const history = [base];
