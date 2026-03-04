@@ -1,9 +1,11 @@
 import type { StockData, OHLCV, OptionChain, OptionContract, FundamentalData, FinancialStatementRow } from '../types';
 import { Tickers } from '../constants';
+import { generateMockStockData } from './mockDataService';
 
 export { Tickers };
 
 const cache = new Map<string, StockData>();
+const USE_MOCK_DATA = true; // Set to true when Yahoo Finance is rate-limiting
 
 const generateMockHistory = (base: number, yearsCount: number = 3): number[] => {
     const history = [base];
@@ -100,6 +102,13 @@ export const fetchFundamentals = async (ticker: string): Promise<FundamentalData
 export const fetchStockData = async (ticker: string): Promise<StockData> => {
   if (cache.has(ticker)) {
     return cache.get(ticker)!;
+  }
+
+  // Use mock data when Yahoo Finance is rate-limiting
+  if (USE_MOCK_DATA) {
+    const mockData = generateMockStockData(ticker);
+    cache.set(ticker, mockData);
+    return mockData;
   }
 
   // Fallback to Yahoo via Backend Proxy
