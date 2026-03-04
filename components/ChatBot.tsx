@@ -33,7 +33,7 @@ const ChatBot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
       const chat = ai.chats.create({
         model: 'gemini-2.5-pro',
         config: {

@@ -3,9 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 import type { NewsResult, SearchSource } from '../types';
 
 export const fetchMarketNews = async (tickers: string[]): Promise<NewsResult> => {
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        throw new Error("API_KEY environment variable not set.");
+        throw new Error("GEMINI_API_KEY environment variable not set.");
     }
 
     const ai = new GoogleGenAI({ apiKey });
