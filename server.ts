@@ -9,7 +9,7 @@ import axios from 'axios';
 dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT) || 8080;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Trust proxy for Cloud Run/Nginx
 app.set('trust proxy', 1);
@@ -17,9 +17,12 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors());
+app.use(cors({
+    origin: process.env.CORS_ORIGINS || '*',
+    credentials: true
+}));
 app.use(session({
-    secret: 'pragati-secret-key',
+    secret: process.env.SESSION_SECRET || 'pragati-secret-key',
     resave: false,
     saveUninitialized: true,
     cookie: { 
@@ -139,7 +142,8 @@ if (process.env.NODE_ENV === 'production') {
         next();
     });
 
-    app.get('*', (req, res) => {
+    // Catch-all route for SPA - Express 5.x compatible
+    app.get(/.*/, (req, res) => {
         res.sendFile(path.join(distPath, 'index.html'));
     });
 } else {
