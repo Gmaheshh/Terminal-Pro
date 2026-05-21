@@ -1,12 +1,9 @@
 import type { StockData, OHLCV, OptionChain, OptionContract, FundamentalData, FinancialStatementRow } from '../types';
 import { Tickers } from '../constants';
-import { generateMockStockData } from './mockDataService';
 
 export { Tickers };
 
 const cache = new Map<string, StockData>();
-const USE_ZERODHA = false; // Will be enabled after user authenticates
-const USE_MOCK_DATA = true; // Fallback to mock if Zerodha not available
 
 const generateMockHistory = (base: number, yearsCount: number = 3): number[] => {
     const history = [base];
@@ -87,7 +84,7 @@ export const fetchFundamentals = async (ticker: string): Promise<FundamentalData
 
         return baseData as FundamentalData;
     } catch (e) {
-        console.error('Fetch Fundamentals Error:', e);
+        console.warn(`Fetch Fundamentals Error for ${ticker}:`, e);
         // Minimal fallback
         return {
             years: ["2024", "2023", "2022"],
@@ -103,13 +100,6 @@ export const fetchFundamentals = async (ticker: string): Promise<FundamentalData
 export const fetchStockData = async (ticker: string): Promise<StockData> => {
   if (cache.has(ticker)) {
     return cache.get(ticker)!;
-  }
-
-  // Use mock data when Yahoo Finance is rate-limiting
-  if (USE_MOCK_DATA) {
-    const mockData = generateMockStockData(ticker);
-    cache.set(ticker, mockData);
-    return mockData;
   }
 
   // Fallback to Yahoo via Backend Proxy
@@ -156,7 +146,7 @@ export const fetchStockData = async (ticker: string): Promise<StockData> => {
     cache.set(ticker, stockData);
     return stockData;
   } catch (error) {
-    console.error('Yahoo Historical Fetch Error:', error);
+    console.warn(`Yahoo Historical Fetch Error for ${ticker}:`, error);
     throw error;
   }
 };

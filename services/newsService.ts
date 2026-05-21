@@ -3,9 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 import type { NewsResult, SearchSource } from '../types';
 
 export const fetchMarketNews = async (tickers: string[]): Promise<NewsResult> => {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-        throw new Error("GEMINI_API_KEY environment variable not set.");
+        throw new Error("API_KEY environment variable not set.");
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -26,9 +26,9 @@ export const fetchMarketNews = async (tickers: string[]): Promise<NewsResult> =>
     Do not add markdown formatting. Just return the JSON.`;
 
     try {
-        // Updated model to gemini-2.5-flash for search grounding tasks
+        // FIX: Updated model to gemini-3-flash-preview for search grounding tasks
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],

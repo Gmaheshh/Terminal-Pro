@@ -103,33 +103,47 @@ const App: React.FC = () => {
     setProcessedStocks([]);
     
     const stocksWithIndicators: Omit<ProcessedStock, 'signals'>[] = [];
-    const batchSize = 5; // Reduced from 15 to avoid rate limiting
+    const batchSize = 5; 
     for (let i = 0; i < Tickers.length; i += batchSize) {
         const batchTickers = Tickers.slice(i, i + batchSize);
         setLoadingMessage(`SYNCING DATA BLOCK ${Math.ceil((i + 1) / batchSize)}/${Math.ceil(Tickers.length / batchSize)}`);
         const fetchDataPromises = batchTickers.map(ticker => fetchStockData(ticker).catch(() => null));
         const fetchedBatchResults = await Promise.all(fetchDataPromises);
+        
+        const newProcessedStocks: ProcessedStock[] = [];
         for (let j = 0; j < fetchedBatchResults.length; j++) {
             const nseData = fetchedBatchResults[j] as StockData | null;
             if (nseData) {
                 const indicators = calculateIndicators(nseData.historical);
-                stocksWithIndicators.push({ ticker: batchTickers[j], data: nseData, indicators: indicators });
+                const stockWithoutSignals = { ticker: batchTickers[j], data: nseData, indicators: indicators };
+                stocksWithIndicators.push(stockWithoutSignals);
+                
+                const signals = generateSignals(indicators, nseData.historical);
+                newProcessedStocks.push({ ...stockWithoutSignals, signals });
             }
         }
-        // Increased delay to avoid rate limiting
+        
+        if (newProcessedStocks.length > 0) {
+            setProcessedStocks(prev => {
+                const updated = [...prev, ...newProcessedStocks];
+                // Update market regime incrementally as well
+                if (updated.length > 10) {
+                    setMarketRegime(detectMarketRegime(updated));
+                }
+                return updated;
+            });
+        }
+        
         if (i + batchSize < Tickers.length) await new Promise(resolve => setTimeout(resolve, 500));
     }
     
+    setLoading(false);
+    runIntelligenceScan(processedStocks); // This will use the final state due to closure, wait, actually we need the final array
+    // Let's use stocksWithIndicators to generate the final array for intelligence scan
     const finalProcessedStocks = stocksWithIndicators.map(stock => {
       const signals = generateSignals(stock.indicators, stock.data.historical);
       return { ...stock, signals: signals };
     });
-
-    const detectedRegime = detectMarketRegime(finalProcessedStocks);
-
-    setMarketRegime(detectedRegime);
-    setProcessedStocks(finalProcessedStocks);
-    setLoading(false);
     runIntelligenceScan(finalProcessedStocks);
   }, [isAuthenticated]);
 

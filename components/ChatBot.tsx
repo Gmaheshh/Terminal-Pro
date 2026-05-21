@@ -33,9 +33,9 @@ const ChatBot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       const chat = ai.chats.create({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3-pro-preview',
         config: {
           systemInstruction: `You are the PRA-GATI Quantitative Analyst, an institutional-grade AI assistant for a high-performance stock market terminal.
           Your expertise includes:
@@ -153,7 +153,7 @@ const ChatBot: React.FC = () => {
           </button>
         </div>
         <div className="mt-3 text-[8px] text-pro-muted text-center font-bold uppercase tracking-widest opacity-50">
-          Powered by Gemini 2.5 Pro Neural Matrix
+          Powered by Gemini 3 Pro Neural Matrix
         </div>
       </div>
     </div>
